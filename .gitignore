@@ -4,9 +4,9 @@ __pycache__/
 dist/
 build/
 .eggs/
-data/
-models/
-results/
+/data/
+/models/
+/results/
 docs/figures/*.png
 *.npz
 *.pt
