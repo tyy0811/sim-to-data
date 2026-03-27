@@ -1,10 +1,8 @@
 """Tests for signal transforms."""
 
-import numpy as np
 import torch
-import pytest
 
-from simtodata.data.transforms import Normalize, SpectrogramTransform
+from simtodata.data.transforms import SpectrogramTransform
 
 
 class TestSpectrogramTransform:

@@ -2,10 +2,13 @@
 
 import numpy as np
 import os
-import pytest
 import tempfile
 
+import torch
+
+from simtodata.data.dataset import InspectionDataset
 from simtodata.data.generate import generate_dataset
+from simtodata.data.transforms import Normalize
 
 
 class TestGenerateDataset:
@@ -65,11 +68,6 @@ class TestGenerateDataset:
             loaded = np.load(path)
             np.testing.assert_array_equal(loaded["signals"], data["signals"])
             np.testing.assert_array_equal(loaded["labels"], data["labels"])
-
-
-import torch
-from simtodata.data.dataset import InspectionDataset
-from simtodata.data.transforms import Normalize
 
 
 class TestInspectionDataset:

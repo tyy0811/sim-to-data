@@ -1,7 +1,6 @@
 """Tests for calibration analysis."""
 
 import numpy as np
-import pytest
 
 from simtodata.evaluation.calibration import reliability_diagram
 

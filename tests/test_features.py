@@ -1,7 +1,6 @@
 """Tests for hand-crafted feature extraction."""
 
 import numpy as np
-import pytest
 
 from simtodata.features.extract import extract_features, extract_features_batch
 from simtodata.simulator.forward_model import TraceParams, generate_trace

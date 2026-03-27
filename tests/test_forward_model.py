@@ -13,7 +13,6 @@ from simtodata.simulator.forward_model import (
     generate_trace,
 )
 from simtodata.simulator.defects import (
-    DefectConfig,
     HIGH_REFLECTIVITY_RANGE,
     LOW_REFLECTIVITY_RANGE,
     classify_severity,

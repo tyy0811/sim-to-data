@@ -6,8 +6,6 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
 
-from simtodata.data.dataset import InspectionDataset
-from simtodata.data.transforms import Normalize
 from simtodata.evaluation.metrics import compute_macro_f1
 from simtodata.models.predict import predict_batch
 from simtodata.models.train import train_model

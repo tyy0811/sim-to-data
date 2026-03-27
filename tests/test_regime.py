@@ -1,8 +1,6 @@
 """Tests for regime configuration and parameter sampling."""
 
 import numpy as np
-import pytest
-import yaml
 
 from simtodata.simulator.regime import RegimeConfig, load_regimes_from_yaml, sample_trace_params
 

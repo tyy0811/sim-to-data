@@ -1,7 +1,6 @@
 """Tests for the 1D CNN defect classifier."""
 
 import torch
-import pytest
 
 from simtodata.models.cnn1d import DefectCNN1D
 from simtodata.models.factory import model_from_config

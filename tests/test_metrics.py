@@ -1,7 +1,6 @@
 """Tests for evaluation metrics."""
 
 import numpy as np
-import pytest
 
 from simtodata.evaluation.metrics import (
     compute_all_metrics,
