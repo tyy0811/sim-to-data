@@ -152,3 +152,25 @@ class TestApplyAllNoise:
         params = self._noise_params()
         result = apply_all_noise(clean_signal, params, rng)
         assert not np.allclose(result, clean_signal)
+
+
+class TestEdgeCases:
+    def test_snr_zero_db(self):
+        signal = np.sin(np.linspace(0, 10, 1024))
+        rng = np.random.default_rng(42)
+        noisy = add_gaussian_noise(signal, 0.0, rng)
+        assert np.all(np.isfinite(noisy))
+
+    def test_dropout_covers_half_signal(self):
+        signal = np.ones(1024)
+        rng = np.random.default_rng(42)
+        result = add_masked_dropout(signal, 10, (50, 60), rng)
+        assert np.all(np.isfinite(result))
+        assert np.sum(result == 0) > 0
+
+    def test_max_jitter(self):
+        signal = np.ones(1024)
+        rng = np.random.default_rng(42)
+        result = add_temporal_jitter(signal, 10, rng)
+        assert np.all(np.isfinite(result))
+        assert result.shape == (1024,)

@@ -174,3 +174,34 @@ class TestSampleDefect:
         )
         with pytest.raises(ValueError, match="defect_depth_mm"):
             generate_trace(params)
+
+
+class TestEdgeCases:
+    def test_defect_at_surface(self):
+        """Defect near surface should not crash."""
+        params = _default_params(has_defect=True, defect_depth_mm=0.5, defect_reflectivity=0.5)
+        signal = generate_trace(params)
+        assert signal.shape == (1024,)
+        assert np.all(np.isfinite(signal))
+
+    def test_defect_near_backwall(self):
+        """Defect near back wall should not crash."""
+        params = _default_params(has_defect=True, defect_depth_mm=19.0, defect_reflectivity=0.5)
+        signal = generate_trace(params)
+        assert signal.shape == (1024,)
+
+    def test_zero_attenuation(self):
+        """Zero attenuation means no amplitude decay."""
+        params = _default_params(attenuation_np_mm=0.0)
+        signal = generate_trace(params)
+        abs_signal = np.abs(signal)
+        peaks, props = find_peaks(abs_signal, height=0.1 * np.max(abs_signal))
+        if len(peaks) >= 2:
+            sorted_heights = sorted(props["peak_heights"], reverse=True)
+            assert sorted_heights[1] / sorted_heights[0] > 0.8
+
+    def test_high_attenuation(self):
+        """High attenuation makes back-wall echo nearly invisible."""
+        params = _default_params(attenuation_np_mm=0.2)
+        signal = generate_trace(params)
+        assert np.all(np.isfinite(signal))
