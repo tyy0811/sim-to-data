@@ -73,3 +73,36 @@ class TestGenerateDataset:
             loaded = np.load(path)
             np.testing.assert_array_equal(loaded["signals"], data["signals"])
             np.testing.assert_array_equal(loaded["labels"], data["labels"])
+
+
+import torch
+from simtodata.data.dataset import InspectionDataset
+from simtodata.data.transforms import Normalize
+
+
+class TestInspectionDataset:
+    def test_tensor_shapes(self, tmp_path):
+        signals = np.random.randn(50, 1024).astype(np.float32)
+        labels = np.array([0] * 17 + [1] * 17 + [2] * 16, dtype=np.int64)
+        np.savez(tmp_path / "test.npz", signals=signals, labels=labels)
+        ds = InspectionDataset(str(tmp_path / "test.npz"))
+        signal, label = ds[0]
+        assert signal.shape == (1, 1024)
+        assert label.shape == ()
+        assert signal.dtype == torch.float32
+
+    def test_length(self, tmp_path):
+        signals = np.random.randn(50, 1024).astype(np.float32)
+        labels = np.zeros(50, dtype=np.int64)
+        np.savez(tmp_path / "test.npz", signals=signals, labels=labels)
+        ds = InspectionDataset(str(tmp_path / "test.npz"))
+        assert len(ds) == 50
+
+    def test_normalize_transform(self, tmp_path):
+        signals = np.random.randn(10, 1024).astype(np.float32) * 5 + 3
+        labels = np.zeros(10, dtype=np.int64)
+        np.savez(tmp_path / "test.npz", signals=signals, labels=labels)
+        ds = InspectionDataset(str(tmp_path / "test.npz"), transform=Normalize())
+        signal, _ = ds[0]
+        assert abs(signal.mean().item()) < 0.01
+        assert abs(signal.std().item() - 1.0) < 0.01
