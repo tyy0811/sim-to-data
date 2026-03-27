@@ -1,0 +1,74 @@
+signal:
+  n_samples: 1024
+  sampling_rate_mhz: 50.0
+
+source_regime:
+  material_thickness_mm: [10.0, 30.0]
+  material_velocity_ms: [5800.0, 6200.0]
+  attenuation_np_mm: [0.01, 0.05]
+  center_freq_mhz: [2.0, 5.0]
+  pulse_sigma_us: [0.5, 1.5]
+  defect_depth_mm: [2.0, 28.0]
+  defect_reflectivity: [0.1, 0.8]
+  snr_db: [20.0, 40.0]
+  baseline_drift: 0.0
+  gain_variation: [1.0, 1.0]
+  jitter_samples: 0
+  masked_dropout:
+    n_gaps: 0
+    gap_length: [0, 0]
+
+shifted_regime:
+  material_thickness_mm: [10.0, 30.0]
+  material_velocity_ms: [5500.0, 6500.0]
+  attenuation_np_mm: [0.01, 0.10]
+  center_freq_mhz: [1.5, 7.0]
+  pulse_sigma_us: [0.3, 2.0]
+  defect_depth_mm: [2.0, 28.0]
+  defect_reflectivity: [0.05, 0.9]
+  snr_db: [5.0, 40.0]
+  baseline_drift: [0.0, 0.3]
+  gain_variation: [0.7, 1.3]
+  jitter_samples: [0, 2]
+  masked_dropout:
+    n_gaps: [0, 3]
+    gap_length: [5, 20]
+
+# Domain randomization: same ranges as shifted.
+# The difference is that source training never touches these ranges.
+# This is a tunable choice — if B3 degrades source performance vs B1,
+# consider 50/50 mixture of source/shifted sampling.
+randomized_regime:
+  material_thickness_mm: [10.0, 30.0]
+  material_velocity_ms: [5500.0, 6500.0]
+  attenuation_np_mm: [0.01, 0.10]
+  center_freq_mhz: [1.5, 7.0]
+  pulse_sigma_us: [0.3, 2.0]
+  defect_depth_mm: [2.0, 28.0]
+  defect_reflectivity: [0.05, 0.9]
+  snr_db: [5.0, 40.0]
+  baseline_drift: [0.0, 0.3]
+  gain_variation: [0.7, 1.3]
+  jitter_samples: [0, 2]
+  masked_dropout:
+    n_gaps: [0, 3]
+    gap_length: [5, 20]
+
+dataset_sizes:
+  train: 20000
+  val: 2000
+  test_source: 3000
+  test_shifted: 3000
+  adapt: 200
+  train_randomized: 20000
+
+class_distribution:
+  no_defect: 0.33
+  low_severity: 0.33
+  high_severity: 0.34
+
+severity_thresholds:
+  low_reflectivity: [0.1, 0.3]
+  high_reflectivity: [0.4, 0.8]
+
+seed: 42
