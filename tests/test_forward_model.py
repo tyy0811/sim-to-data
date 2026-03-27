@@ -130,8 +130,12 @@ class TestClassifySeverity:
         assert classify_severity(0.5) == 2
 
     def test_boundary(self):
+        # LOW_REFLECTIVITY_RANGE upper is 0.3, HIGH lower is 0.4
+        # Values in gap (0.3, 0.4) classify as low (below HIGH threshold)
         assert classify_severity(0.3) == 1
-        assert classify_severity(0.4) == 2
+        assert classify_severity(0.35) == 1  # gap value -> low
+        assert classify_severity(0.4) == 2   # at HIGH threshold -> high
+        assert classify_severity(0.05) == 1  # below LOW range but > 0 -> low
 
 
 class TestSampleDefect:
@@ -157,3 +161,16 @@ class TestSampleDefect:
         rng = np.random.default_rng(42)
         d = sample_defect(rng, 1, (5.0, 15.0))
         assert 5.0 <= d.depth_mm <= 15.0
+
+    def test_depth_clamped_by_thickness(self):
+        rng = np.random.default_rng(42)
+        for _ in range(100):
+            d = sample_defect(rng, 2, (2.0, 28.0), thickness_mm=10.0)
+            assert d.depth_mm < 10.0
+
+    def test_generate_trace_rejects_invalid_depth(self):
+        params = _default_params(
+            has_defect=True, defect_depth_mm=25.0, defect_reflectivity=0.5
+        )
+        with pytest.raises(ValueError, match="defect_depth_mm"):
+            generate_trace(params)

@@ -101,6 +101,18 @@ class TestMaskedDropout:
             if len(gap) > 1:
                 assert np.all(np.diff(gap) == 1)
 
+    def test_gaps_non_overlapping(self):
+        """Gaps should not merge; exactly n_gaps distinct gaps with lengths in range."""
+        signal = np.ones(1024)
+        rng = np.random.default_rng(99)
+        result = add_masked_dropout(signal, 3, (10, 15), rng)
+        zeroed = np.where(result == 0.0)[0]
+        gaps = np.split(zeroed, np.where(np.diff(zeroed) > 1)[0] + 1)
+        gaps = [g for g in gaps if len(g) > 0]
+        assert len(gaps) == 3
+        for gap in gaps:
+            assert 10 <= len(gap) <= 15
+
     def test_deterministic(self, clean_signal):
         r1 = np.random.default_rng(42)
         r2 = np.random.default_rng(42)

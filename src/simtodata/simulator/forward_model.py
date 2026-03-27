@@ -67,6 +67,11 @@ def generate_trace(params: TraceParams) -> np.ndarray:
     )
 
     if params.has_defect:
+        if params.defect_depth_mm >= params.thickness_mm:
+            raise ValueError(
+                f"defect_depth_mm ({params.defect_depth_mm}) must be < "
+                f"thickness_mm ({params.thickness_mm})"
+            )
         t_defect = t_surface + compute_arrival_time(params.defect_depth_mm, params.velocity_ms)
         a_defect = compute_amplitude(
             params.defect_reflectivity, params.attenuation_np_mm, params.defect_depth_mm

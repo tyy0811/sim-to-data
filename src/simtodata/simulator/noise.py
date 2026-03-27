@@ -42,15 +42,32 @@ def add_temporal_jitter(signal: np.ndarray, max_shift: int, rng: np.random.Gener
 def add_masked_dropout(
     signal: np.ndarray, n_gaps: int, gap_length_range: tuple, rng: np.random.Generator
 ) -> np.ndarray:
-    """Zero out contiguous windows to simulate coupling loss or acquisition gaps."""
+    """Zero out non-overlapping contiguous windows to simulate coupling loss.
+
+    Gaps are placed without overlap so the effective gap count and lengths
+    stay within the requested spec.
+    """
     if n_gaps == 0:
         return signal.copy()
     result = signal.copy()
     length = len(signal)
+    occupied = []
     for _ in range(n_gaps):
         gap_len = int(rng.integers(gap_length_range[0], gap_length_range[1] + 1))
-        start = int(rng.integers(0, max(1, length - gap_len)))
-        result[start : start + gap_len] = 0.0
+        # Try to find a non-overlapping position (bounded attempts)
+        placed = False
+        for _attempt in range(50):
+            start = int(rng.integers(0, max(1, length - gap_len)))
+            end = start + gap_len
+            if not any(s < end and start < e for s, e in occupied):
+                occupied.append((start, end))
+                result[start:end] = 0.0
+                placed = True
+                break
+        if not placed:
+            # Fall back: place anyway (signal is too short for non-overlapping)
+            start = int(rng.integers(0, max(1, length - gap_len)))
+            result[start : start + gap_len] = 0.0
     return result
 
 
