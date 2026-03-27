@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 import yaml
 
-from simtodata.simulator.defects import sample_defect
+from simtodata.simulator.defects import HIGH_REFLECTIVITY_RANGE, sample_defect
 from simtodata.simulator.forward_model import TraceParams
 
 
@@ -19,6 +19,7 @@ class RegimeConfig:
     center_freq_mhz: tuple
     pulse_sigma_us: tuple
     defect_depth_mm: tuple
+    defect_reflectivity: tuple
     snr_db: tuple
     baseline_drift: tuple
     gain_variation: tuple
@@ -50,6 +51,7 @@ def load_regimes_from_yaml(yaml_path: str) -> dict:
             center_freq_mhz=_as_tuple(rc["center_freq_mhz"]),
             pulse_sigma_us=_as_tuple(rc["pulse_sigma_us"]),
             defect_depth_mm=_as_tuple(rc["defect_depth_mm"]),
+            defect_reflectivity=_as_tuple(rc["defect_reflectivity"]),
             snr_db=_as_tuple(rc["snr_db"]),
             baseline_drift=_as_tuple(rc.get("baseline_drift", 0)),
             gain_variation=_as_tuple(rc.get("gain_variation", [1.0, 1.0])),
@@ -69,8 +71,18 @@ def sample_trace_params(
 ) -> TraceParams:
     """Sample trace parameters from a regime configuration."""
     thickness = rng.uniform(*regime.thickness_mm)
+    # Split the regime's reflectivity range by severity class:
+    # low severity samples from the lower portion, high from the upper.
+    threshold = HIGH_REFLECTIVITY_RANGE[0]
+    if severity_class == 1:
+        refl_range = (regime.defect_reflectivity[0], min(regime.defect_reflectivity[1], threshold))
+    elif severity_class == 2:
+        refl_range = (max(regime.defect_reflectivity[0], threshold), regime.defect_reflectivity[1])
+    else:
+        refl_range = None
     defect = sample_defect(
-        rng, severity_class, regime.defect_depth_mm, thickness_mm=thickness
+        rng, severity_class, regime.defect_depth_mm,
+        thickness_mm=thickness, reflectivity_range=refl_range,
     )
 
     jitter = (

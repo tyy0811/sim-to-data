@@ -25,11 +25,18 @@ def generate_dataset(regime, n_samples, seed, class_distribution, n_signal_sampl
         sampling_rate_mhz: Sampling rate.
 
     Returns:
-        Dict with 'signals' (n, 1024) and 'labels' (n,).
+        Dict with 'signals' (n, 1024) float32, 'labels' (n,) int64,
+        and per-sample metadata arrays for analysis/debugging.
     """
     rng = np.random.default_rng(seed)
-    signals = np.zeros((n_samples, n_signal_samples))
+    signals = np.zeros((n_samples, n_signal_samples), dtype=np.float32)
     labels = np.zeros(n_samples, dtype=np.int64)
+    thickness = np.zeros(n_samples, dtype=np.float32)
+    velocity = np.zeros(n_samples, dtype=np.float32)
+    attenuation = np.zeros(n_samples, dtype=np.float32)
+    defect_depth = np.zeros(n_samples, dtype=np.float32)
+    defect_reflectivity = np.zeros(n_samples, dtype=np.float32)
+    snr = np.zeros(n_samples, dtype=np.float32)
 
     classes = [0, 1, 2]
     probs = [
@@ -43,10 +50,25 @@ def generate_dataset(regime, n_samples, seed, class_distribution, n_signal_sampl
         params = sample_trace_params(regime, rng, severity, n_signal_samples, sampling_rate_mhz)
         clean = generate_trace(params)
         noisy = apply_all_noise(clean, params, rng)
-        signals[i] = noisy
+        signals[i] = noisy.astype(np.float32)
         labels[i] = severity
+        thickness[i] = params.thickness_mm
+        velocity[i] = params.velocity_ms
+        attenuation[i] = params.attenuation_np_mm
+        defect_depth[i] = params.defect_depth_mm
+        defect_reflectivity[i] = params.defect_reflectivity
+        snr[i] = params.snr_db
 
-    return {"signals": signals, "labels": labels}
+    return {
+        "signals": signals,
+        "labels": labels,
+        "thickness_mm": thickness,
+        "velocity_ms": velocity,
+        "attenuation_np_mm": attenuation,
+        "defect_depth_mm": defect_depth,
+        "defect_reflectivity": defect_reflectivity,
+        "snr_db": snr,
+    }
 
 
 def main():
@@ -84,7 +106,7 @@ def main():
         split_seed = int(rng.integers(0, 2**31))
         data = generate_dataset(regimes[regime_name], n, split_seed, class_dist)
         path = os.path.join(args.output_dir, f"{name}.npz")
-        np.savez(path, signals=data["signals"], labels=data["labels"])
+        np.savez(path, **data)
         print(f"  Saved to {path} ({time.time() - t0:.1f}s)")
 
 

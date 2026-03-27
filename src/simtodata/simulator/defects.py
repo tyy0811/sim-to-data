@@ -30,7 +30,11 @@ def classify_severity(reflectivity: float) -> int:
 
 
 def sample_defect(
-    rng: np.random.Generator, severity: int, depth_range: tuple, thickness_mm: float | None = None
+    rng: np.random.Generator,
+    severity: int,
+    depth_range: tuple,
+    thickness_mm: float | None = None,
+    reflectivity_range: tuple | None = None,
 ) -> DefectConfig:
     """Sample a defect configuration for a given severity class.
 
@@ -40,6 +44,8 @@ def sample_defect(
         depth_range: (min_mm, max_mm) for defect placement.
         thickness_mm: If provided, clamps max depth to thickness_mm - 1.0
                       so the defect echo always precedes the back-wall echo.
+        reflectivity_range: (low, high) range to sample from. If None, uses
+                            the module-level LOW/HIGH_REFLECTIVITY_RANGE constants.
     """
     if severity == 0:
         return DefectConfig(depth_mm=0.0, reflectivity=0.0, severity_label=0)
@@ -49,7 +55,11 @@ def sample_defect(
     if max_depth <= depth_range[0]:
         max_depth = depth_range[0] + 0.1
     depth = rng.uniform(depth_range[0], max_depth)
-    if severity == 1:
+    if reflectivity_range is not None:
+        # Sample from the regime-provided range; severity label is assigned
+        # by the caller (regime sampler), not derived from the value here.
+        reflectivity = rng.uniform(*reflectivity_range)
+    elif severity == 1:
         reflectivity = rng.uniform(*LOW_REFLECTIVITY_RANGE)
     else:
         reflectivity = rng.uniform(*HIGH_REFLECTIVITY_RANGE)

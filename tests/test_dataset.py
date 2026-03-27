@@ -18,6 +18,7 @@ def _source_regime():
         center_freq_mhz=(2.0, 5.0),
         pulse_sigma_us=(0.5, 1.5),
         defect_depth_mm=(2.0, 28.0),
+        defect_reflectivity=(0.1, 0.8),
         snr_db=(20.0, 40.0),
         baseline_drift=(0.0, 0.0),
         gain_variation=(1.0, 1.0),
@@ -33,7 +34,18 @@ class TestGenerateDataset:
         class_dist = {"no_defect": 0.33, "low_severity": 0.33, "high_severity": 0.34}
         data = generate_dataset(regime, 100, seed=42, class_distribution=class_dist)
         assert data["signals"].shape == (100, 1024)
+        assert data["signals"].dtype == np.float32
         assert data["labels"].shape == (100,)
+
+    def test_metadata_present(self):
+        regime = _source_regime()
+        class_dist = {"no_defect": 0.33, "low_severity": 0.33, "high_severity": 0.34}
+        data = generate_dataset(regime, 50, seed=42, class_distribution=class_dist)
+        for key in ["thickness_mm", "velocity_ms", "attenuation_np_mm",
+                     "defect_depth_mm", "defect_reflectivity", "snr_db"]:
+            assert key in data, f"Missing metadata key: {key}"
+            assert data[key].shape == (50,)
+            assert data[key].dtype == np.float32
 
     def test_labels_valid(self):
         regime = _source_regime()

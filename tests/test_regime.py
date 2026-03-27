@@ -16,6 +16,7 @@ def _source_regime():
         center_freq_mhz=(2.0, 5.0),
         pulse_sigma_us=(0.5, 1.5),
         defect_depth_mm=(2.0, 28.0),
+        defect_reflectivity=(0.1, 0.8),
         snr_db=(20.0, 40.0),
         baseline_drift=(0.0, 0.0),
         gain_variation=(1.0, 1.0),
@@ -57,6 +58,44 @@ class TestRegimeConfig:
         for _ in range(100):
             params = sample_trace_params(regime, rng, severity_class=2)
             assert params.defect_depth_mm < params.thickness_mm
+
+    def test_reflectivity_uses_regime_range(self):
+        """Shifted regime has wider reflectivity range than module defaults."""
+        regime = RegimeConfig(
+            name="custom",
+            thickness_mm=(15.0, 25.0),
+            velocity_ms=(5800.0, 6200.0),
+            attenuation_np_mm=(0.01, 0.05),
+            center_freq_mhz=(2.0, 5.0),
+            pulse_sigma_us=(0.5, 1.5),
+            defect_depth_mm=(2.0, 20.0),
+            defect_reflectivity=(0.05, 0.9),
+            snr_db=(20.0, 40.0),
+            baseline_drift=(0.0, 0.0),
+            gain_variation=(1.0, 1.0),
+            jitter_samples=(0, 0),
+            dropout_n_gaps=(0, 0),
+            dropout_gap_length=(0, 0),
+        )
+        rng = np.random.default_rng(42)
+        low_reflectivities = []
+        high_reflectivities = []
+        for _ in range(200):
+            p = sample_trace_params(regime, rng, severity_class=1)
+            low_reflectivities.append(p.defect_reflectivity)
+            p = sample_trace_params(regime, rng, severity_class=2)
+            high_reflectivities.append(p.defect_reflectivity)
+        # Low severity should sample from [0.05, 0.4) — below HIGH threshold
+        assert min(low_reflectivities) >= 0.05
+        assert max(low_reflectivities) < 0.4
+        # High severity should sample from [0.4, 0.9]
+        assert min(high_reflectivities) >= 0.4
+        assert max(high_reflectivities) <= 0.9
+
+    def test_reflectivity_loaded_from_yaml(self):
+        regimes = load_regimes_from_yaml("configs/simulator.yaml")
+        assert regimes["source"].defect_reflectivity == (0.1, 0.8)
+        assert regimes["shifted"].defect_reflectivity == (0.05, 0.9)
 
 
 class TestLoadRegimes:
