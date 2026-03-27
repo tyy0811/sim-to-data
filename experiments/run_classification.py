@@ -30,7 +30,27 @@ def _save_result(name, metrics, results_dir, y_true=None, y_pred=None):
     print(f"  Saved: {path}")
 
 
+SEED = 42
+
+
+def _seed_everything(seed: int):
+    """Set all random seeds for reproducibility."""
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def _seeded_loader(dataset, batch_size, shuffle):
+    """Create a DataLoader with a seeded generator for reproducible shuffling."""
+    generator = torch.Generator()
+    generator.manual_seed(SEED)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=generator)
+
+
 def main():
+    _seed_everything(SEED)
+
     config_path = "configs/model_cnn1d.yaml"
     with open(config_path) as f:
         config = yaml.safe_load(f)
@@ -49,12 +69,12 @@ def main():
     randomized_train = InspectionDataset("data/randomized_train.npz", transform=norm)
 
     bs = tc["batch_size"]
-    train_loader = DataLoader(source_train, batch_size=bs, shuffle=True)
-    val_loader = DataLoader(source_val, batch_size=bs)
-    source_test_loader = DataLoader(source_test, batch_size=bs)
-    shifted_test_loader = DataLoader(shifted_test, batch_size=bs)
-    adapt_loader = DataLoader(adapt_data, batch_size=bs, shuffle=True)
-    rand_train_loader = DataLoader(randomized_train, batch_size=bs, shuffle=True)
+    train_loader = _seeded_loader(source_train, bs, shuffle=True)
+    val_loader = _seeded_loader(source_val, bs, shuffle=False)
+    source_test_loader = _seeded_loader(source_test, bs, shuffle=False)
+    shifted_test_loader = _seeded_loader(shifted_test, bs, shuffle=False)
+    adapt_loader = _seeded_loader(adapt_data, bs, shuffle=True)
+    rand_train_loader = _seeded_loader(randomized_train, bs, shuffle=True)
 
     # B1: Source -> Source
     print("B1: Training on source, eval on source...")

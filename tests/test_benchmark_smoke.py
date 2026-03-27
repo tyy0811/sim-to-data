@@ -9,6 +9,7 @@ from simtodata.data.transforms import Normalize
 from simtodata.models.cnn1d import DefectCNN1D
 from simtodata.models.train import train_model
 from simtodata.models.predict import predict_batch
+from simtodata.evaluation.metrics import compute_all_metrics
 from simtodata.simulator.regime import RegimeConfig
 
 
@@ -60,3 +61,13 @@ def test_end_to_end_smoke():
     assert probs.shape == (10, 3)
     assert np.allclose(probs.sum(axis=1), 1.0, atol=1e-5)
     assert all(p in {0, 1, 2} for p in preds)
+
+    # Exercise the metrics layer — the full pipeline gate
+    metrics = compute_all_metrics(true_labels, preds, probs)
+    assert "macro_f1" in metrics
+    assert "auroc" in metrics
+    assert "ece" in metrics
+    assert "per_class" in metrics
+    assert len(metrics["per_class"]["precision"]) == 3
+    assert 0 <= metrics["macro_f1"] <= 1
+    assert np.isfinite(metrics["ece"])
