@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.eggs/
+data/
+models/
+results/
+docs/figures/*.png
+*.npz
+*.pt
+*.joblib
+.ruff_cache/
+.pytest_cache/
