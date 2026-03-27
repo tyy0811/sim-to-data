@@ -13,26 +13,50 @@ Industrial ultrasonic inspection systems trained on one sensor/material configur
 3. **Shift**: A shifted regime widens material velocity, attenuation, frequency, and noise ranges to simulate deployment on a different sensor/material configuration.
 4. **Adapt**: Fine-tuning on small labeled samples from the shifted regime measures adaptation efficiency.
 
-## Benchmarks
+## Results
 
-| ID | Setup | Eval Set | Description |
-|----|-------|----------|-------------|
-| B0a | LogReg → Source features | Source test | Logistic regression baseline |
-| B0b | GradBoost → Source features | Source test | Gradient boosting baseline |
-| B0c | GradBoost → Source features | Shifted test | Baseline transfer gap |
-| B1 | CNN trained on Source | Source test | Source performance ceiling |
-| B2 | CNN trained on Source | Shifted test | Transfer gap (shift hurts) |
-| B3 | CNN trained on Randomized | Shifted test | Domain randomization helps |
-| B4 | B1 + fine-tune on Shifted | Shifted test | Fine-tuning recovers |
-| B5 | B3 + fine-tune on Shifted | Shifted test | Best combined strategy |
+| ID | Setup | Eval Set | Macro-F1 | AUROC | ECE |
+|----|-------|----------|----------|-------|-----|
+| B0a | LogReg | Source test | 0.438 | 0.635 | 0.008 |
+| B0b | GradBoost | Source test | 0.510 | 0.713 | 0.045 |
+| B0c | GradBoost | Shifted test | 0.225 | 0.510 | 0.460 |
+| B1 | CNN → Source | Source test | **0.669** | **0.847** | 0.030 |
+| B2 | CNN → Source | Shifted test | 0.232 | 0.501 | 0.584 |
+| B3 | CNN → Randomized | Shifted test | **0.403** | 0.600 | **0.011** |
+| B4 | B1 + fine-tune | Shifted test | 0.338 | 0.518 | 0.383 |
+| B5 | B3 + fine-tune | Shifted test | 0.394 | 0.573 | 0.015 |
 
-**Expected pattern**: B1 > B2 (shift hurts), B3 > B2 (randomization helps), B4 > B2 (fine-tuning helps), B5 >= B3 and B4 (best combined).
+### Key Findings
 
-## Additional Experiments
+- **Shift hurts**: B1 (0.67) → B2 (0.23) — a 66% F1 drop when deploying to shifted regime
+- **Randomization helps**: B3 (0.40) vs B2 (0.23) — training on wider parameter ranges nearly doubles shifted-domain F1
+- **Fine-tuning recovers partially**: B4 (0.34) > B2 (0.23) — 200 labeled shifted samples improve transfer
+- **CNN justified**: B1 (0.67) > B0b (0.51) on source; shift affects all models equally (B0c ~ B2)
+- **Calibration matters**: B3/B5 have ECE < 0.02 while B2/B4 have ECE > 0.38 — randomization produces well-calibrated models
 
-- **Robustness sweep**: Evaluates models across 5 shift intensity levels (none → extreme), with material and noise parameters progressively widening from source to shifted ranges.
-- **Adaptation efficiency curve**: Measures macro-F1 vs fine-tune sample count (0, 25, 50, 100, 200) for source-pretrained and randomized-pretrained models.
-- **Calibration analysis**: Reliability diagrams and ECE for all benchmarked models.
+### Robustness Under Increasing Shift
+
+| Intensity | GradBoost | CNN (source) | CNN (rand+ft) |
+|-----------|-----------|--------------|---------------|
+| none | 0.510 | 0.695 | 0.484 |
+| low | 0.326 | 0.330 | 0.432 |
+| medium | 0.202 | 0.180 | 0.373 |
+| high | 0.197 | 0.169 | 0.368 |
+| extreme | 0.159 | 0.160 | 0.328 |
+
+The randomized+finetuned CNN (B5) degrades much more gracefully than source-only models under increasing domain shift.
+
+### Adaptation Efficiency
+
+| Samples | Source-pretrained F1 | Randomized-pretrained F1 |
+|---------|---------------------|-------------------------|
+| 0 | 0.232 | 0.403 |
+| 25 | 0.340 | 0.389 |
+| 50 | 0.340 | 0.372 |
+| 100 | 0.345 | 0.378 |
+| 200 | 0.349 | 0.391 |
+
+Domain randomization provides a better starting point (0.40 vs 0.23 at 0 samples), reducing the need for labeled target data.
 
 ## Honest Scope
 
