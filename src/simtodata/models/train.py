@@ -3,7 +3,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from sklearn.metrics import f1_score
+from simtodata.evaluation.metrics import compute_macro_f1
 
 
 def _evaluate(model, dataloader, criterion, device):
@@ -21,7 +21,7 @@ def _evaluate(model, dataloader, criterion, device):
             all_preds.extend(logits.argmax(dim=1).cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
     avg_loss = total_loss / n
-    f1 = f1_score(all_labels, all_preds, average="macro")
+    f1 = compute_macro_f1(np.array(all_labels), np.array(all_preds))
     return avg_loss, f1
 
 
