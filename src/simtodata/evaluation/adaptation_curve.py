@@ -49,10 +49,16 @@ def run_adaptation_sweep(model_template, pretrained_path, adapt_dataset, eval_lo
                 f1_scores.append(compute_macro_f1(labels, preds))
                 break  # No variance for 0 samples
             else:
-                rng = np.random.default_rng(42 + repeat)
+                repeat_seed = 42 + repeat
+                rng = np.random.default_rng(repeat_seed)
+                torch.manual_seed(repeat_seed)
                 indices = rng.choice(adapt_size, size=count, replace=False)
                 subset = Subset(adapt_dataset, indices.tolist())
-                ft_loader = DataLoader(subset, batch_size=min(64, count), shuffle=True)
+                gen = torch.Generator()
+                gen.manual_seed(repeat_seed)
+                ft_loader = DataLoader(
+                    subset, batch_size=min(64, count), shuffle=True, generator=gen
+                )
                 model, _ = train_model(model, ft_loader, epochs=ft_epochs, lr=ft_lr)
                 preds, _, labels = predict_batch(model, eval_loader)
                 f1_scores.append(compute_macro_f1(labels, preds))

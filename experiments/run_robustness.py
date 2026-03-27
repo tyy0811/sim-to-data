@@ -41,8 +41,14 @@ def main():
         models.append((model_b5, True))
         names.append("B5_cnn1d_rand_ft")
 
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--quick", action="store_true")
+    args = parser.parse_args()
+
+    n_samples = 100 if args.quick else 1000
     print("Running robustness sweep...")
-    results = run_robustness_sweep(models, names)
+    results = run_robustness_sweep(models, names, n_samples=n_samples)
 
     with open("results/robustness_sweep.json", "w") as f:
         json.dump(results, f, indent=2)

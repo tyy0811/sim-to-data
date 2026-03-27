@@ -12,23 +12,11 @@ from simtodata.models.baselines import create_baseline
 from simtodata.models.cnn1d import DefectCNN1D
 from simtodata.models.predict import predict_batch
 from simtodata.models.train import train_model
-from simtodata.simulator.regime import RegimeConfig
 
 
-def _source_regime():
-    return RegimeConfig(
-        name="source", thickness_mm=(10, 30), velocity_ms=(5800, 6200),
-        attenuation_np_mm=(0.01, 0.05), center_freq_mhz=(2, 5),
-        pulse_sigma_us=(0.5, 1.5), defect_depth_mm=(2, 28),
-        defect_reflectivity=(0.1, 0.8),
-        snr_db=(20, 40), baseline_drift=(0, 0), gain_variation=(1, 1),
-        jitter_samples=(0, 0), dropout_n_gaps=(0, 0), dropout_gap_length=(0, 0),
-    )
-
-
-def test_baseline_pipeline():
+def test_baseline_pipeline(source_regime):
     """Generate -> extract features -> fit baseline -> predict -> metrics."""
-    regime = _source_regime()
+    regime = source_regime
     class_dist = {"no_defect": 0.33, "low_severity": 0.33, "high_severity": 0.34}
     data = generate_dataset(regime, 300, seed=42, class_distribution=class_dist)
 
@@ -46,9 +34,9 @@ def test_baseline_pipeline():
     assert np.isfinite(metrics["ece"])
 
 
-def test_cnn_pipeline():
+def test_cnn_pipeline(source_regime):
     """Generate -> dataset -> train CNN -> predict -> metrics."""
-    regime = _source_regime()
+    regime = source_regime
     class_dist = {"no_defect": 0.33, "low_severity": 0.33, "high_severity": 0.34}
     data = generate_dataset(regime, 120, seed=42, class_distribution=class_dist)
 

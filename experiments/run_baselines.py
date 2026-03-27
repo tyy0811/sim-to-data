@@ -32,8 +32,11 @@ def main():
     probs = clf_lr.predict_proba(source_test_feat)
     metrics = compute_all_metrics(source_test["labels"], preds, probs)
     print(f"  F1: {metrics['macro_f1']:.4f}")
+    result = {"name": "B0a", "metrics": metrics,
+              "y_true": source_test["labels"].tolist(), "y_pred": preds.tolist(),
+              "y_proba": probs.tolist()}
     with open("results/B0a_logreg_source_on_source.json", "w") as f:
-        json.dump({"name": "B0a", "metrics": metrics}, f, indent=2)
+        json.dump(result, f, indent=2)
 
     # B0b: GradBoost on source
     print("B0b: Gradient Boosting...")
@@ -44,8 +47,11 @@ def main():
     probs = clf_gb.predict_proba(source_test_feat)
     metrics = compute_all_metrics(source_test["labels"], preds, probs)
     print(f"  F1: {metrics['macro_f1']:.4f}")
+    result = {"name": "B0b", "metrics": metrics,
+              "y_true": source_test["labels"].tolist(), "y_pred": preds.tolist(),
+              "y_proba": probs.tolist()}
     with open("results/B0b_gb_source_on_source.json", "w") as f:
-        json.dump({"name": "B0b", "metrics": metrics}, f, indent=2)
+        json.dump(result, f, indent=2)
 
     # B0c: GradBoost on shifted
     print("B0c: GradBoost -> shifted...")
@@ -53,8 +59,11 @@ def main():
     probs = clf_gb.predict_proba(shifted_test_feat)
     metrics = compute_all_metrics(shifted_test["labels"], preds, probs)
     print(f"  F1: {metrics['macro_f1']:.4f}")
+    result = {"name": "B0c", "metrics": metrics,
+              "y_true": shifted_test["labels"].tolist(), "y_pred": preds.tolist(),
+              "y_proba": probs.tolist()}
     with open("results/B0c_gb_source_on_shifted.json", "w") as f:
-        json.dump({"name": "B0c", "metrics": metrics}, f, indent=2)
+        json.dump(result, f, indent=2)
 
 
 if __name__ == "__main__":

@@ -17,13 +17,15 @@ from simtodata.models.train import train_model
 from simtodata.evaluation.metrics import compute_all_metrics
 
 
-def _save_result(name, metrics, results_dir, y_true=None, y_pred=None):
+def _save_result(name, metrics, results_dir, y_true=None, y_pred=None, y_proba=None):
     os.makedirs(results_dir, exist_ok=True)
     result = {"name": name, "metrics": metrics}
     if y_true is not None:
         result["y_true"] = y_true.tolist()
     if y_pred is not None:
         result["y_pred"] = y_pred.tolist()
+    if y_proba is not None:
+        result["y_proba"] = y_proba.tolist()
     path = os.path.join(results_dir, f"{name}.json")
     with open(path, "w") as f:
         json.dump(result, f, indent=2)
@@ -49,6 +51,11 @@ def _seeded_loader(dataset, batch_size, shuffle):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--quick", action="store_true", help="Reduced epochs for quick runs")
+    args = parser.parse_args()
+
     _seed_everything(SEED)
 
     config_path = "configs/model_cnn1d.yaml"
@@ -56,6 +63,9 @@ def main():
         config = yaml.safe_load(f)
     tc = config["training"]
     ft = config["finetune"]
+    if args.quick:
+        tc = {**tc, "epochs": 5, "early_stopping_patience": 3}
+        ft = {**ft, "epochs": 3}
     results_dir = "results"
     models_dir = "models"
     os.makedirs(models_dir, exist_ok=True)
@@ -88,14 +98,14 @@ def main():
     preds, probs, labels = predict_batch(model_b1, source_test_loader)
     metrics = compute_all_metrics(labels, preds, probs)
     print(f"  B1 Macro-F1: {metrics['macro_f1']:.4f}")
-    _save_result("B1_cnn1d_source_on_source", metrics, results_dir, labels, preds)
+    _save_result("B1_cnn1d_source_on_source", metrics, results_dir, labels, preds, probs)
 
     # B2: Source -> Shifted (reuse B1 model)
     print("B2: Eval B1 on shifted...")
     preds, probs, labels = predict_batch(model_b1, shifted_test_loader)
     metrics = compute_all_metrics(labels, preds, probs)
     print(f"  B2 Macro-F1: {metrics['macro_f1']:.4f}")
-    _save_result("B2_cnn1d_source_on_shifted", metrics, results_dir, labels, preds)
+    _save_result("B2_cnn1d_source_on_shifted", metrics, results_dir, labels, preds, probs)
 
     # B3: Randomized -> Shifted
     print("B3: Training on randomized, eval on shifted...")
@@ -109,7 +119,7 @@ def main():
     preds, probs, labels = predict_batch(model_b3, shifted_test_loader)
     metrics = compute_all_metrics(labels, preds, probs)
     print(f"  B3 Macro-F1: {metrics['macro_f1']:.4f}")
-    _save_result("B3_cnn1d_randomized_on_shifted", metrics, results_dir, labels, preds)
+    _save_result("B3_cnn1d_randomized_on_shifted", metrics, results_dir, labels, preds, probs)
 
     # B4: Source + fine-tune -> Shifted
     print("B4: Fine-tuning B1 on adapt, eval on shifted...")
@@ -121,7 +131,7 @@ def main():
     preds, probs, labels = predict_batch(model_b4, shifted_test_loader)
     metrics = compute_all_metrics(labels, preds, probs)
     print(f"  B4 Macro-F1: {metrics['macro_f1']:.4f}")
-    _save_result("B4_cnn1d_source_finetune_on_shifted", metrics, results_dir, labels, preds)
+    _save_result("B4_cnn1d_source_finetune_on_shifted", metrics, results_dir, labels, preds, probs)
 
     # B5: Randomized + fine-tune -> Shifted
     print("B5: Fine-tuning B3 on adapt, eval on shifted...")
@@ -133,7 +143,7 @@ def main():
     preds, probs, labels = predict_batch(model_b5, shifted_test_loader)
     metrics = compute_all_metrics(labels, preds, probs)
     print(f"  B5 Macro-F1: {metrics['macro_f1']:.4f}")
-    _save_result("B5_cnn1d_randomized_finetune_on_shifted", metrics, results_dir, labels, preds)
+    _save_result("B5_cnn1d_randomized_finetune_on_shifted", metrics, results_dir, labels, preds, probs)
 
 
 if __name__ == "__main__":
