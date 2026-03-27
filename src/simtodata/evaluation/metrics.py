@@ -4,15 +4,25 @@ import numpy as np
 from sklearn.metrics import f1_score, precision_recall_fscore_support, roc_auc_score
 
 
+NUM_CLASSES = 3
+CLASS_LABELS = list(range(NUM_CLASSES))
+
+
 def compute_macro_f1(y_true, y_pred):
     """Compute macro-averaged F1 score."""
-    return float(f1_score(y_true, y_pred, average="macro"))
+    return float(f1_score(y_true, y_pred, average="macro", labels=CLASS_LABELS, zero_division=0))
 
 
-def compute_auroc(y_true, y_proba, num_classes=3):
-    """Compute macro-averaged AUROC (one-vs-rest)."""
+def compute_auroc(y_true, y_proba):
+    """Compute macro-averaged AUROC (one-vs-rest).
+
+    Returns nan if fewer than 2 classes are present in y_true
+    (AUROC is undefined in that case).
+    """
     try:
-        return float(roc_auc_score(y_true, y_proba, multi_class="ovr", average="macro"))
+        return float(roc_auc_score(
+            y_true, y_proba, multi_class="ovr", average="macro", labels=CLASS_LABELS
+        ))
     except ValueError:
         return float("nan")
 
@@ -35,9 +45,13 @@ def compute_ece(y_true, y_proba, n_bins=10):
 
 
 def compute_per_class_metrics(y_true, y_pred):
-    """Compute per-class precision, recall, and F1."""
+    """Compute per-class precision, recall, and F1.
+
+    Always returns arrays of length NUM_CLASSES, even if some classes
+    are absent from the eval split.
+    """
     precision, recall, f1, _ = precision_recall_fscore_support(
-        y_true, y_pred, average=None, zero_division=0
+        y_true, y_pred, average=None, labels=CLASS_LABELS, zero_division=0
     )
     return {
         "precision": [float(p) for p in precision],

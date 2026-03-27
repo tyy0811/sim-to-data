@@ -76,6 +76,18 @@ class TestPerClassMetrics:
         assert "recall" in result
         assert len(result["precision"]) == 3
 
+    def test_missing_class_still_returns_3(self):
+        """Per-class arrays must always be length 3, even if a class is absent."""
+        y_true = np.array([0, 0, 1, 1])  # no class 2
+        y_pred = np.array([0, 1, 1, 0])
+        result = compute_per_class_metrics(y_true, y_pred)
+        assert len(result["precision"]) == 3
+        assert len(result["recall"]) == 3
+        assert len(result["f1"]) == 3
+        # Class 2 metrics should be 0 (zero_division=0)
+        assert result["precision"][2] == 0.0
+        assert result["recall"][2] == 0.0
+
 
 class TestComputeAllMetrics:
     def test_all_keys_present(self):
@@ -87,3 +99,20 @@ class TestComputeAllMetrics:
         assert "auroc" in metrics
         assert "ece" in metrics
         assert "per_class" in metrics
+
+    def test_missing_class_stable_schema(self):
+        """All metrics should return without error when a class is absent."""
+        y_true = np.array([0, 0, 1, 1])
+        y_pred = np.array([0, 0, 1, 1])
+        y_proba = np.array([
+            [0.9, 0.05, 0.05],
+            [0.8, 0.1, 0.1],
+            [0.1, 0.8, 0.1],
+            [0.05, 0.9, 0.05],
+        ])
+        metrics = compute_all_metrics(y_true, y_pred, y_proba)
+        assert np.isfinite(metrics["macro_f1"])
+        assert np.isfinite(metrics["ece"])
+        assert len(metrics["per_class"]["precision"]) == 3
+        # AUROC may be nan with missing class — that's the documented contract
+        assert isinstance(metrics["auroc"], float)
