@@ -12,31 +12,58 @@ from simtodata.simulator.regime import RegimeConfig
 
 
 INTENSITIES = {
-    "none": dict(snr_db=(30, 40), baseline_drift=(0, 0), gain_variation=(1, 1),
-                 jitter_samples=(0, 0), dropout_n_gaps=(0, 0), dropout_gap_length=(0, 0)),
-    "low": dict(snr_db=(15, 25), baseline_drift=(0, 0.1), gain_variation=(0.9, 1.1),
-                jitter_samples=(0, 1), dropout_n_gaps=(0, 1), dropout_gap_length=(5, 10)),
-    "medium": dict(snr_db=(8, 15), baseline_drift=(0.1, 0.2), gain_variation=(0.8, 1.2),
-                   jitter_samples=(0, 2), dropout_n_gaps=(1, 2), dropout_gap_length=(5, 15)),
-    "high": dict(snr_db=(3, 8), baseline_drift=(0.2, 0.3), gain_variation=(0.7, 1.3),
-                 jitter_samples=(1, 3), dropout_n_gaps=(1, 3), dropout_gap_length=(10, 20)),
-    "extreme": dict(snr_db=(1, 5), baseline_drift=(0.3, 0.5), gain_variation=(0.5, 1.5),
-                    jitter_samples=(2, 5), dropout_n_gaps=(2, 4), dropout_gap_length=(15, 30)),
+    "none": dict(
+        # Source-regime material params — true no-shift baseline
+        velocity_ms=(5800, 6200), attenuation_np_mm=(0.01, 0.05),
+        center_freq_mhz=(2.0, 5.0), pulse_sigma_us=(0.5, 1.5),
+        defect_reflectivity=(0.1, 0.8),
+        snr_db=(30, 40), baseline_drift=(0, 0), gain_variation=(1, 1),
+        jitter_samples=(0, 0), dropout_n_gaps=(0, 0), dropout_gap_length=(0, 0),
+    ),
+    "low": dict(
+        velocity_ms=(5700, 6300), attenuation_np_mm=(0.01, 0.06),
+        center_freq_mhz=(1.8, 5.5), pulse_sigma_us=(0.4, 1.6),
+        defect_reflectivity=(0.08, 0.85),
+        snr_db=(15, 25), baseline_drift=(0, 0.1), gain_variation=(0.9, 1.1),
+        jitter_samples=(0, 1), dropout_n_gaps=(0, 1), dropout_gap_length=(5, 10),
+    ),
+    "medium": dict(
+        velocity_ms=(5600, 6400), attenuation_np_mm=(0.01, 0.08),
+        center_freq_mhz=(1.6, 6.0), pulse_sigma_us=(0.35, 1.8),
+        defect_reflectivity=(0.06, 0.88),
+        snr_db=(8, 15), baseline_drift=(0.1, 0.2), gain_variation=(0.8, 1.2),
+        jitter_samples=(0, 2), dropout_n_gaps=(1, 2), dropout_gap_length=(5, 15),
+    ),
+    "high": dict(
+        velocity_ms=(5500, 6500), attenuation_np_mm=(0.01, 0.10),
+        center_freq_mhz=(1.5, 7.0), pulse_sigma_us=(0.3, 2.0),
+        defect_reflectivity=(0.05, 0.9),
+        snr_db=(3, 8), baseline_drift=(0.2, 0.3), gain_variation=(0.7, 1.3),
+        jitter_samples=(1, 3), dropout_n_gaps=(1, 3), dropout_gap_length=(10, 20),
+    ),
+    "extreme": dict(
+        velocity_ms=(5500, 6500), attenuation_np_mm=(0.01, 0.10),
+        center_freq_mhz=(1.5, 7.0), pulse_sigma_us=(0.3, 2.0),
+        defect_reflectivity=(0.05, 0.9),
+        snr_db=(1, 5), baseline_drift=(0.3, 0.5), gain_variation=(0.5, 1.5),
+        jitter_samples=(2, 5), dropout_n_gaps=(2, 4), dropout_gap_length=(15, 30),
+    ),
 }
 
 
 def make_intensity_regime(intensity_name, base_regime=None):
-    """Create a RegimeConfig for a given shift intensity."""
+    """Create a RegimeConfig for a given shift intensity.
+
+    Material and signal parameters widen progressively from source-regime
+    values (none) toward full shifted-regime ranges (high/extreme), so
+    the sweep isolates domain shift rather than confounding material
+    variation with noise severity.
+    """
     params = INTENSITIES[intensity_name]
     return RegimeConfig(
         name=f"intensity_{intensity_name}",
         thickness_mm=(10.0, 30.0),
-        velocity_ms=(5500.0, 6500.0),
-        attenuation_np_mm=(0.01, 0.10),
-        center_freq_mhz=(1.5, 7.0),
-        pulse_sigma_us=(0.3, 2.0),
         defect_depth_mm=(2.0, 28.0),
-        defect_reflectivity=(0.05, 0.9),
         **params,
     )
 
