@@ -6,25 +6,24 @@ import torch.nn as nn
 class DefectCNN1D(nn.Module):
     """1D convolutional network for A-scan classification."""
 
-    def __init__(self, channels=(32, 64, 128), kernels=(7, 5, 3), fc_hidden=64,
-                 dropout=0.3, num_classes=3):
+    def __init__(self, channels=(32, 64, 128, 128), kernels=(7, 5, 3, 3), fc_hidden=128,
+                 dropout=0.3, num_classes=3, pool_size=4):
         super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv1d(1, channels[0], kernels[0], stride=2),
-            nn.BatchNorm1d(channels[0]),
-            nn.ReLU(),
-            nn.MaxPool1d(2),
-            nn.Conv1d(channels[0], channels[1], kernels[1], stride=1),
-            nn.BatchNorm1d(channels[1]),
-            nn.ReLU(),
-            nn.MaxPool1d(2),
-            nn.Conv1d(channels[1], channels[2], kernels[2], stride=1),
-            nn.BatchNorm1d(channels[2]),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool1d(1),
-        )
+        layers = []
+        in_ch = 1
+        for i, (out_ch, k) in enumerate(zip(channels, kernels)):
+            stride = 2 if i == 0 else 1
+            layers.extend([
+                nn.Conv1d(in_ch, out_ch, k, stride=stride, padding=k // 2),
+                nn.BatchNorm1d(out_ch),
+                nn.ReLU(),
+                nn.MaxPool1d(2),
+            ])
+            in_ch = out_ch
+        layers.append(nn.AdaptiveAvgPool1d(pool_size))
+        self.features = nn.Sequential(*layers)
         self.classifier = nn.Sequential(
-            nn.Linear(channels[2], fc_hidden),
+            nn.Linear(channels[-1] * pool_size, fc_hidden),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(fc_hidden, num_classes),

@@ -1,8 +1,16 @@
-"""Run full benchmark pipeline on Modal GPU."""
+"""Run full benchmark pipeline on Modal GPU.
+
+Usage: modal run modal_train.py
+"""
+
+import os
+from pathlib import Path
 
 import modal
 
 app = modal.App("sim-to-data-benchmark")
+
+LOCAL_PROJECT_DIR = str(Path(__file__).resolve().parent)
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -17,7 +25,7 @@ image = (
     )
     .env({"PYTHONPATH": "/root/sim-to-data/src"})
     .add_local_dir(
-        "/Users/zenith/Desktop/sim-to-data",
+        LOCAL_PROJECT_DIR,
         remote_path="/root/sim-to-data",
         ignore=["__pycache__", ".git", ".eggs", "data/", "models/", "results/",
                 "docs/figures/", ".ruff_cache", ".pytest_cache", "*.egg-info",
@@ -26,27 +34,12 @@ image = (
 )
 
 
-@app.function(image=image, gpu="T4", timeout=1800)
+@app.function(image=image, gpu="T4", timeout=3600)
 def run_benchmark():
+    import json
     import subprocess
     import sys
-    import os
 
-    os.chdir("/root/sim-to-data")
-    # Add src to path so simtodata is importable
-    sys.path.insert(0, "/root/sim-to-data/src")
-
-    # Generate datasets
-    print("=== Generating datasets ===")
-    subprocess.run([sys.executable, "-m", "simtodata.data.generate"], check=True)
-
-    # Run baselines
-    print("\n=== Running baselines B0a-B0c ===")
-    subprocess.run([sys.executable, "experiments/run_baselines.py"], check=True)
-
-    # Run CNN B1-B5 on GPU
-    print("\n=== Running CNN B1-B5 (GPU) ===")
-    import json
     import numpy as np
     import torch
     import yaml
@@ -54,11 +47,24 @@ def run_benchmark():
 
     from simtodata.data.dataset import InspectionDataset
     from simtodata.data.transforms import Normalize
+    from simtodata.evaluation.metrics import compute_all_metrics
     from simtodata.models.factory import model_from_config
     from simtodata.models.predict import predict_batch
     from simtodata.models.train import train_model
-    from simtodata.evaluation.metrics import compute_all_metrics
 
+    os.chdir("/root/sim-to-data")
+    env = {**os.environ, "PYTHONPATH": "/root/sim-to-data/src"}
+
+    # Generate datasets
+    print("=== Generating datasets ===")
+    subprocess.run([sys.executable, "-m", "simtodata.data.generate"], check=True, env=env)
+
+    # Run baselines
+    print("\n=== Running baselines B0a-B0c ===")
+    subprocess.run([sys.executable, "experiments/run_baselines.py"], check=True, env=env)
+
+    # CNN B1-B5 on GPU
+    print("\n=== Running CNN B1-B5 (GPU) ===")
     SEED = 42
     np.random.seed(SEED)
     torch.manual_seed(SEED)
@@ -168,7 +174,19 @@ def run_benchmark():
     print(f"  B5 F1: {metrics['macro_f1']:.4f}")
     save_result("B5_cnn1d_randomized_finetune_on_shifted", metrics, labels, preds, probs)
 
-    # Collect results
+    # Robustness sweep
+    print("\n=== Running robustness sweep ===")
+    subprocess.run([sys.executable, "experiments/run_robustness.py"], check=True, env=env)
+
+    # Adaptation curve
+    print("\n=== Running adaptation curve ===")
+    subprocess.run([sys.executable, "experiments/run_adaptation_curve.py"], check=True, env=env)
+
+    # Generate figures
+    print("\n=== Generating figures ===")
+    subprocess.run([sys.executable, "experiments/generate_figures.py"], check=True, env=env)
+
+    # Collect all results
     all_results = {}
     for name in ["B0a_logreg_source_on_source", "B0b_gb_source_on_source",
                   "B0c_gb_source_on_shifted", "B1_cnn1d_source_on_source",
@@ -176,14 +194,11 @@ def run_benchmark():
                   "B4_cnn1d_source_finetune_on_shifted",
                   "B5_cnn1d_randomized_finetune_on_shifted"]:
         with open(f"results/{name}.json") as f:
-            d = json.load(f)
-        all_results[name] = d
+            all_results[name] = json.load(f)
 
     for extra in ["robustness_sweep", "adaptation_curve"]:
-        path = f"results/{extra}.json"
-        if os.path.exists(path):
-            with open(path) as f:
-                all_results[extra] = json.load(f)
+        with open(f"results/{extra}.json") as f:
+            all_results[extra] = json.load(f)
 
     return all_results
 
@@ -191,33 +206,30 @@ def run_benchmark():
 @app.local_entrypoint()
 def main():
     import json
-    import os
-    results = run_benchmark.remote()
 
+    results = run_benchmark.remote()
     os.makedirs("results", exist_ok=True)
 
     print("\n" + "=" * 60)
     print("  BENCHMARK RESULTS")
     print("=" * 60)
+    benchmark_names = [
+        "B0a_logreg_source_on_source", "B0b_gb_source_on_source",
+        "B0c_gb_source_on_shifted", "B1_cnn1d_source_on_source",
+        "B2_cnn1d_source_on_shifted", "B3_cnn1d_randomized_on_shifted",
+        "B4_cnn1d_source_finetune_on_shifted",
+        "B5_cnn1d_randomized_finetune_on_shifted",
+    ]
     print(f"\n{'ID':<45} {'F1':>6} {'AUROC':>7} {'ECE':>7}")
     print("-" * 68)
-    for name in ["B0a_logreg_source_on_source", "B0b_gb_source_on_source",
-                  "B0c_gb_source_on_shifted", "B1_cnn1d_source_on_source",
-                  "B2_cnn1d_source_on_shifted", "B3_cnn1d_randomized_on_shifted",
-                  "B4_cnn1d_source_finetune_on_shifted",
-                  "B5_cnn1d_randomized_finetune_on_shifted"]:
-        d = results[name]
-        m = d["metrics"]
+    for name in benchmark_names:
+        m = results[name]["metrics"]
         print(f"{name:<45} {m['macro_f1']:>6.4f} {m['auroc']:>7.4f} {m['ece']:>7.4f}")
-        # Save each result locally
         with open(f"results/{name}.json", "w") as f:
-            json.dump(d, f, indent=2)
+            json.dump(results[name], f, indent=2)
 
-    if "robustness" in results:
-        with open("results/robustness_sweep.json", "w") as f:
-            json.dump(results["robustness"], f, indent=2)
-    if "adaptation" in results:
-        with open("results/adaptation_curve.json", "w") as f:
-            json.dump(results["adaptation"], f, indent=2)
+    for extra in ["robustness_sweep", "adaptation_curve"]:
+        with open(f"results/{extra}.json", "w") as f:
+            json.dump(results[extra], f, indent=2)
 
     print("\nAll results saved locally to results/")

@@ -19,6 +19,7 @@ def model_from_config(config_path: str):
             fc_hidden=arch["fc_hidden"],
             dropout=arch["dropout"],
             num_classes=arch["num_classes"],
+            pool_size=arch.get("pool_size", 4),
         )
     if arch["type"] == "cnn_2d_spectrogram":
         return DefectCNN2D(

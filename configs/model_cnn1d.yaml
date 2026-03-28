@@ -1,10 +1,11 @@
 architecture:
   type: cnn_1d
-  channels: [32, 64, 128]
-  kernels: [7, 5, 3]
-  fc_hidden: 64
+  channels: [32, 64, 128, 128]
+  kernels: [7, 5, 3, 3]
+  fc_hidden: 128
   dropout: 0.3
   num_classes: 3
+  pool_size: 4
 
 training:
   epochs: 80
