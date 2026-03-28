@@ -6,10 +6,9 @@ import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 
 from simtodata.data.generate import generate_dataset
-from simtodata.simulator.regime import RegimeConfig
+from simtodata.simulator.regime import load_regimes_from_yaml
 
 
 def _load_json(path):
@@ -61,14 +60,11 @@ def plot_adaptation_curve(results_path, save_path):
     plt.close(fig)
 
 
-def plot_example_traces(save_path):
-    """Plot example traces: 3 classes x 2 regimes."""
-    source = RegimeConfig("source", (15, 25), (5800, 6200), (0.01, 0.05), (2, 5),
-                          (0.5, 1.5), (2, 28), (0.1, 0.8), (25, 35), (0, 0), (1, 1),
-                          (0, 0), (0, 0), (0, 0))
-    shifted = RegimeConfig("shifted", (15, 25), (5500, 6500), (0.01, 0.10), (1.5, 7),
-                           (0.3, 2), (2, 28), (0.05, 0.9), (8, 15), (0.1, 0.2), (0.8, 1.2),
-                           (0, 2), (1, 2), (5, 15))
+def plot_example_traces(save_path, config_path="configs/simulator.yaml"):
+    """Plot example traces: 3 classes x 2 regimes, loaded from YAML config."""
+    regimes = load_regimes_from_yaml(config_path)
+    source = regimes["source"]
+    shifted = regimes["shifted"]
 
     fig, axes = plt.subplots(2, 3, figsize=(12, 6))
     class_names = ["No Defect", "Low Severity", "High Severity"]

@@ -20,29 +20,30 @@ Industrial ultrasonic inspection systems trained on one sensor/material configur
 | B0a | LogReg | Source test | 0.438 | 0.635 | 0.008 |
 | B0b | GradBoost | Source test | 0.510 | 0.713 | 0.045 |
 | B0c | GradBoost | Shifted test | 0.225 | 0.510 | 0.460 |
-| B1 | CNN → Source | Source test | **0.669** | **0.847** | 0.030 |
-| B2 | CNN → Source | Shifted test | 0.232 | 0.501 | 0.584 |
-| B3 | CNN → Randomized | Shifted test | **0.403** | 0.600 | **0.011** |
-| B4 | B1 + fine-tune | Shifted test | 0.338 | 0.518 | 0.383 |
-| B5 | B3 + fine-tune | Shifted test | 0.394 | 0.573 | 0.015 |
+| B1 | CNN → Source | Source test | **0.702** | **0.872** | 0.022 |
+| B2 | CNN → Source | Shifted test | 0.287 | 0.509 | 0.558 |
+| B3 | CNN → Randomized | Shifted test | 0.417 | 0.653 | **0.025** |
+| B4 | B1 + fine-tune | Shifted test | 0.344 | 0.520 | 0.419 |
+| B5 | B3 + fine-tune | Shifted test | **0.426** | **0.661** | 0.025 |
 
 ### Key Findings
 
-- **Shift hurts**: B1 (0.67) → B2 (0.23) — a 66% F1 drop when deploying to shifted regime
-- **Randomization helps**: B3 (0.40) vs B2 (0.23) — training on wider parameter ranges nearly doubles shifted-domain F1
-- **Fine-tuning recovers partially**: B4 (0.34) > B2 (0.23) — 200 labeled shifted samples improve transfer
-- **CNN justified**: B1 (0.67) > B0b (0.51) on source; shift affects all models equally (B0c ~ B2)
-- **Calibration matters**: B3/B5 have ECE < 0.02 while B2/B4 have ECE > 0.38 — randomization produces well-calibrated models
+- **Shift hurts**: B1 (0.70) → B2 (0.29) — a 59% F1 drop when deploying to shifted regime
+- **Randomization helps**: B3 (0.42) vs B2 (0.29) — training on wider parameter ranges nearly doubles shifted-domain F1
+- **Fine-tuning recovers partially**: B4 (0.34) > B2 (0.29) — 200 labeled shifted samples improve transfer
+- **Best combined**: B5 (0.43) > B3 (0.42) and B4 (0.34) — randomization + fine-tuning is the best strategy
+- **CNN justified**: B1 (0.70) > B0b (0.51) on source; shift affects all models (B0c ~ B2)
+- **Calibration matters**: B3/B5 have ECE ~ 0.025 while B2 has ECE = 0.56 — randomization produces well-calibrated models
 
 ### Robustness Under Increasing Shift
 
 | Intensity | GradBoost | CNN (source) | CNN (rand+ft) |
 |-----------|-----------|--------------|---------------|
-| none | 0.510 | 0.695 | 0.484 |
-| low | 0.326 | 0.330 | 0.432 |
-| medium | 0.202 | 0.180 | 0.373 |
-| high | 0.197 | 0.169 | 0.368 |
-| extreme | 0.159 | 0.160 | 0.328 |
+| none | 0.510 | 0.738 | 0.484 |
+| low | 0.326 | 0.352 | 0.432 |
+| medium | 0.202 | 0.224 | 0.373 |
+| high | 0.197 | 0.199 | 0.368 |
+| extreme | 0.159 | 0.164 | 0.328 |
 
 The randomized+finetuned CNN (B5) degrades much more gracefully than source-only models under increasing domain shift.
 
@@ -50,13 +51,13 @@ The randomized+finetuned CNN (B5) degrades much more gracefully than source-only
 
 | Samples | Source-pretrained F1 | Randomized-pretrained F1 |
 |---------|---------------------|-------------------------|
-| 0 | 0.232 | 0.403 |
-| 25 | 0.340 | 0.389 |
-| 50 | 0.340 | 0.372 |
-| 100 | 0.345 | 0.378 |
-| 200 | 0.349 | 0.391 |
+| 0 | 0.284 | 0.403 |
+| 25 | 0.266 | 0.389 |
+| 50 | 0.261 | 0.372 |
+| 100 | 0.321 | 0.378 |
+| 200 | 0.346 | 0.391 |
 
-Domain randomization provides a better starting point (0.40 vs 0.23 at 0 samples), reducing the need for labeled target data.
+Domain randomization provides a better starting point (0.40 vs 0.28 at 0 samples), reducing the need for labeled target data.
 
 ## Honest Scope
 

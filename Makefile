@@ -22,7 +22,7 @@ test:
 	pytest tests/ -v
 
 lint:
-	ruff check src/ tests/
+	ruff check src/ tests/ experiments/
 
 clean:
 	rm -rf results/ data/ models/ docs/figures/*.png
