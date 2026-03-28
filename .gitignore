@@ -6,7 +6,10 @@ build/
 .eggs/
 /data/
 /models/
-/results/
+/results/*
+!results/multiseed/
+results/multiseed/*
+!results/multiseed/aggregated.json
 docs/figures/_generated/
 *.npz
 *.pt
@@ -15,3 +18,4 @@ docs/figures/_generated/
 .pytest_cache/
 docs/plans/
 modal_train.py
+modal_multiseed.py

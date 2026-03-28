@@ -1,6 +1,6 @@
 # sim-to-data
 
-Synthetic ultrasonic inspection pipeline for evaluating defect detectors under controlled domain shift.
+Synthetic ultrasonic inspection pipeline benchmarking defect detectors under controlled domain shift.
 
 ## Problem
 
@@ -21,27 +21,46 @@ Industrial ultrasonic inspection systems trained on one sensor/material configur
 
 ## Results
 
+All CNN results (B1-B5) are reported as mean ± std across 5 training seeds on a fixed dataset. Baseline models (B0a-B0c) use deterministic sklearn estimators and produce identical results on the fixed dataset.
+
 | ID | Setup | Eval Set | Macro-F1 | AUROC | ECE |
 |----|-------|----------|----------|-------|-----|
 | B0a | LogReg | Source test | 0.438 | 0.635 | 0.008 |
 | B0b | GradBoost | Source test | 0.510 | 0.713 | 0.045 |
 | B0c | GradBoost | Shifted test | 0.225 | 0.510 | 0.460 |
-| B1 | CNN | Source test | **0.822** | **0.946** | 0.024 |
-| B2 | CNN | Shifted test | 0.288 | 0.543 | 0.575 |
-| B3 | CNN (randomized) | Shifted test | **0.544** | **0.743** | 0.096 |
-| B4 | B1 + fine-tune | Shifted test | 0.366 | 0.550 | 0.374 |
-| B5 | B3 + fine-tune | Shifted test | **0.542** | **0.742** | 0.094 |
+| B1 | CNN | Source test | **0.837 ± 0.006** | **0.951 ± 0.003** | 0.018 ± 0.006 |
+| B2 | CNN | Shifted test | 0.265 ± 0.011 | 0.538 ± 0.005 | 0.609 ± 0.010 |
+| B3 | CNN (randomized) | Shifted test | **0.542 ± 0.004** | **0.738 ± 0.006** | 0.098 ± 0.032 |
+| B4 | B1 + fine-tune | Shifted test | 0.368 ± 0.008 | 0.546 ± 0.006 | 0.391 ± 0.032 |
+| B5 | B3 + fine-tune | Shifted test | **0.550 ± 0.005** | **0.747 ± 0.006** | 0.071 ± 0.022 |
 
 ### Key Findings
 
-- **Shift hurts**: B1 (0.82) → B2 (0.29) — a 65% F1 drop when deploying to shifted regime
-- **Randomization helps**: B3 (0.54) vs B2 (0.29) — training on wider parameter ranges nearly doubles shifted-domain F1
-- **Fine-tuning recovers partially**: B4 (0.37) > B2 (0.29) — 200 labeled shifted samples improve transfer
-- **Best combined**: B5 (0.54) ≈ B3 (0.54) — fine-tuning preserves randomized performance
-- **CNN justified**: B1 (0.82) >> B0b (0.51) on source; shift affects all models (B0c ~ B2)
-- **Calibration**: B3/B5 have ECE ~ 0.09 while B2 has ECE = 0.58 — randomization produces better-calibrated models
+Variance reflects training randomness (initialization, batch order) on a fixed dataset, not data-sampling variance.
 
-Note: F1 = 0.54 under heavy domain shift with only 200 adaptation samples represents substantial robustness — source-only models collapse to F1 = 0.16 under extreme conditions while the randomized model maintains 0.41.
+- **Shift hurts consistently**: B1 → B2 shows a &Delta; = -0.57 F1 drop across all 5 runs, with no overlap in confidence intervals.
+- **Randomization helps reliably**: B3 (0.542 ± 0.004) vs B2 (0.265 ± 0.011) — a stable +0.28 improvement with low variance.
+- **Fine-tuning preserves gains**: B5 (0.550 ± 0.005) &asymp; B3 (0.542 ± 0.004) — 200 adaptation samples do not degrade randomized performance.
+- **CNN justified**: B1 (0.837 ± 0.006) >> B0b (0.510) on source.
+- **Calibration**: B3/B5 have ECE &le; 0.10 while B2 has ECE = 0.61 — domain randomization produces better-calibrated models.
+
+### Failure Mode Analysis
+
+Under domain shift, the model collapses toward predicting high-severity for nearly all inputs. In B2, no-defect recall drops to 3%, low-severity to 18%, and high-severity inflates to 86% — the model predicts "high" regardless of true class. Domain randomization (B5) recovers no-defect recall to 75% and low-severity to 40%, though high-severity recall drops to 52% as the model distributes predictions more evenly.
+
+Low-severity defects remain the hardest class across all conditions — the safety-critical failure pattern is that subtle defects are missed, not obvious ones.
+
+<p align="center">
+  <img src="docs/figures/confusion_matrices.png" width="800" alt="Confusion matrices for B1, B2, and B5 showing per-class recall under domain shift">
+</p>
+
+### Calibration
+
+<p align="center">
+  <img src="docs/figures/calibration_diagram.png" width="700" alt="Reliability diagrams comparing B2 and B5 calibration">
+</p>
+
+B2 (source-only, shifted evaluation) is severely miscalibrated (ECE = 0.609 ± 0.010) — the model is overconfident on incorrect predictions. B5 (randomized + fine-tuned) achieves ECE = 0.071 ± 0.022, indicating that domain randomization improves not just accuracy but also prediction trustworthiness.
 
 ### Robustness Under Increasing Shift
 
@@ -73,6 +92,16 @@ Note: F1 = 0.54 under heavy domain shift with only 200 adaptation samples repres
 
 Domain randomization provides a substantially better starting point (0.54 vs 0.29 at 0 samples), reducing the need for labeled target data.
 
+## Statistical Methodology
+
+CNN experiments (B1-B5) are repeated across 5 random seeds controlling model initialization and training order on a fixed dataset (seed=42). Results are reported as mean ± standard deviation. Baseline models (B0a-B0c) use deterministic sklearn estimators and produce identical results on the fixed dataset.
+
+With 5 seeds, formal significance testing has limited statistical power. We report effect sizes and consistency across runs rather than p-values. All 5 B3 runs individually outperform all 5 B2 runs (no overlap), providing strong qualitative evidence for the randomization effect.
+
+## Context
+
+Domain shift in sensor-based ML is studied in sim-to-real robotics (Tobin et al., 2017), medical imaging (Stacke et al., 2020), and theoretically via domain divergence bounds (Ben-David et al., 2010). This project applies domain randomization and supervised fine-tuning to synthetic ultrasonic inspection. Adversarial adaptation methods (Ganin et al., 2016; Sun & Saenko, 2016) are not implemented and noted as possible extensions.
+
 ## Honest Scope
 
 - All data is **purely synthetic** — the forward model is a simplified pulse-echo simulation, not a validated physics engine. Results demonstrate methodology, not field-ready performance.
@@ -94,6 +123,10 @@ python experiments/run_all.py
 
 # Quick mode (small datasets, reduced epochs)
 python experiments/run_all.py --quick
+
+# Multi-seed benchmark (5 training seeds)
+python experiments/run_multiseed.py
+python experiments/aggregate_multiseed.py
 ```
 
 ## Makefile
