@@ -13,3 +13,5 @@ docs/figures/*.png
 *.joblib
 .ruff_cache/
 .pytest_cache/
+docs/plans/
+modal_train.py
