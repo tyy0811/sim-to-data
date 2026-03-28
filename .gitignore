@@ -7,7 +7,7 @@ build/
 /data/
 /models/
 /results/
-docs/figures/*.png
+docs/figures/_generated/
 *.npz
 *.pt
 *.joblib

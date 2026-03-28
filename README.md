@@ -13,6 +13,12 @@ Industrial ultrasonic inspection systems trained on one sensor/material configur
 3. **Shift**: A shifted regime widens material velocity, attenuation, frequency, and noise ranges to simulate deployment on a different sensor/material configuration.
 4. **Adapt**: Fine-tuning on small labeled samples from the shifted regime measures adaptation efficiency.
 
+### Example Traces
+
+<p align="center">
+  <img src="docs/figures/example_traces.png" width="800" alt="Example A-scan traces across source and shifted regimes for each defect severity class">
+</p>
+
 ## Results
 
 | ID | Setup | Eval Set | Macro-F1 | AUROC | ECE |
@@ -20,9 +26,9 @@ Industrial ultrasonic inspection systems trained on one sensor/material configur
 | B0a | LogReg | Source test | 0.438 | 0.635 | 0.008 |
 | B0b | GradBoost | Source test | 0.510 | 0.713 | 0.045 |
 | B0c | GradBoost | Shifted test | 0.225 | 0.510 | 0.460 |
-| B1 | CNN → Source | Source test | **0.822** | **0.946** | 0.024 |
-| B2 | CNN → Source | Shifted test | 0.288 | 0.543 | 0.575 |
-| B3 | CNN → Randomized | Shifted test | **0.544** | **0.743** | 0.096 |
+| B1 | CNN | Source test | **0.822** | **0.946** | 0.024 |
+| B2 | CNN | Shifted test | 0.288 | 0.543 | 0.575 |
+| B3 | CNN (randomized) | Shifted test | **0.544** | **0.743** | 0.096 |
 | B4 | B1 + fine-tune | Shifted test | 0.366 | 0.550 | 0.374 |
 | B5 | B3 + fine-tune | Shifted test | **0.542** | **0.742** | 0.094 |
 
@@ -35,7 +41,13 @@ Industrial ultrasonic inspection systems trained on one sensor/material configur
 - **CNN justified**: B1 (0.82) >> B0b (0.51) on source; shift affects all models (B0c ~ B2)
 - **Calibration**: B3/B5 have ECE ~ 0.09 while B2 has ECE = 0.58 — randomization produces better-calibrated models
 
+Note: F1 = 0.54 under heavy domain shift with only 200 adaptation samples represents substantial robustness — source-only models collapse to F1 = 0.16 under extreme conditions while the randomized model maintains 0.41.
+
 ### Robustness Under Increasing Shift
+
+<p align="center">
+  <img src="docs/figures/robustness_curve.png" width="600" alt="F1 vs shift intensity for GradBoost, source CNN, and randomized+finetuned CNN">
+</p>
 
 | Intensity | GradBoost | CNN (source) | CNN (rand+ft) |
 |-----------|-----------|--------------|---------------|
@@ -45,9 +57,11 @@ Industrial ultrasonic inspection systems trained on one sensor/material configur
 | high | 0.197 | 0.181 | 0.459 |
 | extreme | 0.159 | 0.160 | 0.405 |
 
-The randomized+finetuned CNN (B5) degrades much more gracefully than source-only models under increasing domain shift. At extreme intensity, B5 maintains F1 = 0.41 while source-only models collapse to ~0.16.
-
 ### Adaptation Efficiency
+
+<p align="center">
+  <img src="docs/figures/adaptation_curve.png" width="600" alt="F1 vs fine-tune sample count for source-pretrained and randomized-pretrained models">
+</p>
 
 | Samples | Source-pretrained F1 | Randomized-pretrained F1 |
 |---------|---------------------|-------------------------|
@@ -116,6 +130,5 @@ sim-to-data/
 ├── configs/                # YAML configs for simulator and models
 ├── experiments/            # Experiment scripts and figure generation
 ├── tests/                  # Test suite
-├── docs/plans/             # Design and implementation plans
 └── Makefile
 ```
