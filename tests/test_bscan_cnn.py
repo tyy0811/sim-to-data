@@ -1,7 +1,6 @@
 """Tests for B-scan 2D CNN."""
 
 import torch
-import numpy as np
 
 from simtodata.models.cnn2d_bscan import BscanCNN
 

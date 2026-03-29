@@ -8,7 +8,6 @@ from simtodata.simulator.bscan import (
     generate_synthetic_bscan,
     generate_bscan_dataset,
 )
-from simtodata.simulator.regime import load_regimes_from_yaml
 
 
 @pytest.fixture

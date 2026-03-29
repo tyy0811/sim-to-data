@@ -49,7 +49,7 @@ class TestVirkkunenLoader:
         _make_fake_batch(str(tmp_path), "batch02", n_samples=6)
         loader = VirkkunenLoader(str(tmp_path))
         _, labels, _ = loader.load_batch("batch02")
-        assert all(l in (0, 1) for l in labels)
+        assert all(lab in (0, 1) for lab in labels)
 
     def test_load_batch_normalized(self, tmp_path):
         _make_fake_batch(str(tmp_path), "batch03", n_samples=3)
