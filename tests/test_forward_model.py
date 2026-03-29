@@ -204,3 +204,24 @@ class TestEdgeCases:
         params = _default_params(attenuation_np_mm=0.2)
         signal = generate_trace(params)
         assert np.all(np.isfinite(signal))
+
+
+class TestDefectConfigPositionMm:
+    def test_default_is_none(self):
+        from simtodata.simulator.defects import DefectConfig
+        d = DefectConfig(depth_mm=10.0, reflectivity=0.5, severity_label=2)
+        assert d.position_mm is None
+
+    def test_explicit_position(self):
+        from simtodata.simulator.defects import DefectConfig
+        d = DefectConfig(depth_mm=10.0, reflectivity=0.5, severity_label=2, position_mm=42.0)
+        assert d.position_mm == 42.0
+
+    def test_sample_defect_still_works(self):
+        """sample_defect() must not break — it doesn't pass position_mm."""
+        import numpy as np
+        from simtodata.simulator.defects import sample_defect
+        rng = np.random.default_rng(42)
+        d = sample_defect(rng, severity=1, depth_range=(2.0, 28.0))
+        assert d.position_mm is None
+        assert d.depth_mm > 0
