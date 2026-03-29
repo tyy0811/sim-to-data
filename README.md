@@ -38,7 +38,7 @@ All CNN results (B1-B5) are reported as mean ± std across 5 training seeds on a
 
 Variance reflects training randomness (initialization, batch order) on a fixed dataset, not data-sampling variance.
 
-- **Shift hurts consistently**: B1 → B2 shows a &Delta; = -0.57 F1 drop across all 5 runs, with no overlap in confidence intervals.
+- **Shift hurts consistently**: B1 → B2 shows a &Delta; = -0.57 F1 drop; all 5 B2 runs fall below all 5 B1 runs (no overlap in observed ranges).
 - **Randomization helps reliably**: B3 (0.542 ± 0.004) vs B2 (0.265 ± 0.011) — a stable +0.28 improvement with low variance.
 - **Fine-tuning preserves gains**: B5 (0.550 ± 0.005) &asymp; B3 (0.542 ± 0.004) — 200 adaptation samples do not degrade randomized performance.
 - **CNN justified**: B1 (0.837 ± 0.006) >> B0b (0.510) on source.
@@ -52,17 +52,21 @@ Low-severity defects remain the hardest class across all conditions — the safe
 
 <p align="center">
   <img src="docs/figures/confusion_matrices.png" width="800" alt="Confusion matrices for B1, B2, and B5 showing per-class recall under domain shift">
+  <br><em>Representative seed (seed=42). Per-class recalls are consistent across all 5 training seeds.</em>
 </p>
 
 ### Calibration
 
 <p align="center">
   <img src="docs/figures/calibration_diagram.png" width="700" alt="Reliability diagrams comparing B2 and B5 calibration">
+  <br><em>Representative seed (seed=42).</em>
 </p>
 
-B2 (source-only, shifted evaluation) is severely miscalibrated (ECE = 0.609 ± 0.010) — the model is overconfident on incorrect predictions. B5 (randomized + fine-tuned) achieves ECE = 0.071 ± 0.022, indicating that domain randomization improves not just accuracy but also prediction trustworthiness.
+B2 (source-only, shifted evaluation) is severely miscalibrated (ECE = 0.609 ± 0.010) — the model is overconfident on incorrect predictions. B5 (randomized + fine-tuned) achieves ECE = 0.071 ± 0.022, an 8.6&times; reduction in calibration error, indicating that domain randomization improves not just accuracy but also prediction trustworthiness.
 
 ### Robustness Under Increasing Shift
+
+Robustness and adaptation results below are from a single representative seed (seed=42). Each intensity level generates a fresh test set with progressively wider parameter ranges.
 
 <p align="center">
   <img src="docs/figures/robustness_curve.png" width="600" alt="F1 vs shift intensity for GradBoost, source CNN, and randomized+finetuned CNN">
@@ -90,7 +94,7 @@ B2 (source-only, shifted evaluation) is severely miscalibrated (ECE = 0.609 ± 0
 | 100 | 0.362 | 0.539 |
 | 200 | 0.353 | 0.547 |
 
-Domain randomization provides a substantially better starting point (0.54 vs 0.29 at 0 samples), reducing the need for labeled target data.
+Fine-tuning the source-pretrained model plateaus at F1 &asymp; 0.37 regardless of sample count (25-200), while the randomized model starts at 0.54 — domain randomization cannot be replaced by more target labels at this scale.
 
 ## Statistical Methodology
 
@@ -100,7 +104,7 @@ With 5 seeds, formal significance testing has limited statistical power. We repo
 
 ## Context
 
-Domain shift in sensor-based ML is studied in sim-to-real robotics (Tobin et al., 2017), medical imaging (Stacke et al., 2020), and theoretically via domain divergence bounds (Ben-David et al., 2010). This project applies domain randomization and supervised fine-tuning to synthetic ultrasonic inspection. Adversarial adaptation methods (Ganin et al., 2016; Sun & Saenko, 2016) are not implemented and noted as possible extensions.
+Domain shift in sensor-based ML is studied in sim-to-real robotics (Tobin et al., 2017), medical imaging (Stacke et al., 2020), and theoretically via domain divergence bounds (Ben-David et al., 2010). This project applies domain randomization and supervised fine-tuning to synthetic ultrasonic inspection, testing whether these simple strategies suffice before reaching for more complex domain adaptation machinery (Ganin et al., 2016; Sun & Saenko, 2016).
 
 ## Honest Scope
 
