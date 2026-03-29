@@ -111,6 +111,56 @@ class TestGenerateSyntheticBscan:
         result = generate_synthetic_bscan(source_regime, rng)
         assert np.all(np.isfinite(result.bscan))
 
+    def test_mask_aligned_with_jitter(self):
+        """Mask should cover defect echo region even when jitter shifts the trace."""
+        from simtodata.simulator.regime import RegimeConfig
+        from simtodata.simulator.defects import DefectConfig
+
+        regime = RegimeConfig(
+            name="jittery",
+            thickness_mm=(20.0, 20.0),
+            velocity_ms=(6000.0, 6000.0),
+            attenuation_np_mm=(0.02, 0.02),
+            center_freq_mhz=(3.0, 3.0),
+            pulse_sigma_us=(1.0, 1.0),
+            defect_depth_mm=(5.0, 15.0),
+            defect_reflectivity=(0.6, 0.6),
+            snr_db=(40.0, 40.0),
+            baseline_drift=(0.0, 0.0),
+            gain_variation=(1.0, 1.0),
+            jitter_samples=(10, 10),  # guaranteed non-zero jitter
+            dropout_n_gaps=(0, 0),
+            dropout_gap_length=(0, 0),
+        )
+        defect = DefectConfig(
+            depth_mm=10.0, reflectivity=0.6, severity_label=2, position_mm=16.0,
+        )
+        rng = np.random.default_rng(42)
+        result = generate_synthetic_bscan(
+            regime, rng, n_positions=32, defects=[defect], return_mask=True,
+        )
+        # The mask should cover the defect echo region (not the surface echo).
+        # Defect at 10mm, v=6000m/s: arrival ~4.3us -> sample ~217, ±10 jitter.
+        # Surface echo is near sample ~50, so mask center far from surface
+        # confirms the mask tracks the shifted defect, not the clean position.
+        pos = 16
+        assert result.mask[pos].any(), "Mask should have True values at beam center"
+        masked = np.where(result.mask[pos])[0]
+        mask_center = float(np.mean(masked))
+        assert 180 < mask_center < 260, (
+            f"Mask center at {mask_center:.0f}, expected near defect echo (~217)"
+        )
+
+    def test_defect_without_position_labeled_zero(self, source_regime):
+        """A defect with position_mm=None should not count as flaw."""
+        from simtodata.simulator.defects import DefectConfig
+        rng = np.random.default_rng(42)
+        defect = DefectConfig(depth_mm=10.0, reflectivity=0.5, severity_label=2)
+        result = generate_synthetic_bscan(
+            source_regime, rng, n_positions=32, defects=[defect],
+        )
+        assert result.label == 0, "Defect without position_mm should be labeled 0"
+
 
 class TestGenerateBscanDataset:
     def test_shapes(self, source_regime):
@@ -122,10 +172,23 @@ class TestGenerateBscanDataset:
 
     def test_class_balance(self, source_regime):
         data = generate_bscan_dataset(
-            source_regime, n_samples=100, seed=42, flaw_ratio=0.5,
+            source_regime, n_samples=200, seed=42, flaw_ratio=0.5,
         )
         n_flaw = (data["labels"] == 1).sum()
-        assert 30 < n_flaw < 70  # roughly 50%
+        observed = n_flaw / len(data["labels"])
+        assert 0.35 < observed < 0.65, f"flaw_ratio=0.5 but got {observed:.3f}"
+
+    def test_flaw_ratio_honored(self, source_regime):
+        """flaw_ratio should control actual positive rate without compounding."""
+        for ratio in [0.0, 0.25, 0.5, 0.75, 1.0]:
+            data = generate_bscan_dataset(
+                source_regime, n_samples=200, seed=42, flaw_ratio=ratio,
+                n_positions=16,
+            )
+            observed = (data["labels"] == 1).mean()
+            assert abs(observed - ratio) < 0.15, (
+                f"flaw_ratio={ratio} but observed={observed:.3f}"
+            )
 
     def test_labels_binary(self, source_regime):
         data = generate_bscan_dataset(source_regime, n_samples=20, seed=42)

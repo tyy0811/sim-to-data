@@ -59,6 +59,7 @@ def generate_synthetic_bscan(
     beam_width_positions: int = 8,
     return_mask: bool = False,
     mask_threshold: float = 0.1,
+    defect_prob: float = 0.5,
 ) -> BscanResult:
     """Generate a synthetic B-scan by stacking A-scans with spatial defect model.
 
@@ -67,11 +68,17 @@ def generate_synthetic_bscan(
         rng: NumPy random generator.
         n_positions: Number of scan positions (rows in B-scan).
         defects: Explicit defect list with position_mm set. If None, samples 0 or 1
-                 defect internally (Extension 1 default behavior).
+                 defect internally using defect_prob.
         beam_width_positions: Defect echo visible over this many positions.
+                 NOTE: only the dominant defect (highest effective reflectivity)
+                 is rendered per position. Extension 6 may need additive
+                 rendering for overlapping defects.
         return_mask: When False, result.mask is None. When True, mask is computed
-                     from echo thresholding.
+                     from echo thresholding in the noised domain (tracks jitter).
         mask_threshold: Fraction of peak echo amplitude for mask threshold.
+        defect_prob: Probability of defect when defects=None. Use 1.0 to
+                     guarantee a defect (used by generate_bscan_dataset to
+                     honor flaw_ratio).
 
     Returns:
         BscanResult with bscan, label, and optional mask.
@@ -82,7 +89,7 @@ def generate_synthetic_bscan(
 
     # If defects not provided, sample 0 or 1
     if defects is None:
-        has_defect = rng.random() < 0.5
+        has_defect = rng.random() < defect_prob
         if has_defect:
             severity = rng.choice([1, 2])
             defect_cfg = sample_defect(
@@ -101,7 +108,8 @@ def generate_synthetic_bscan(
         else:
             defects = []
 
-    label = 1 if len(defects) > 0 else 0
+    # Only count defects that have a spatial position (can actually be rendered)
+    label = 1 if any(d.position_mm is not None for d in defects) else 0
     n_samples = base_params.n_samples
     bscan = np.zeros((n_positions, n_samples))
     mask = np.zeros((n_positions, n_samples), dtype=bool) if return_mask else None
@@ -133,22 +141,28 @@ def generate_synthetic_bscan(
                 params.defect_depth_mm = defect.depth_mm
                 params.defect_reflectivity = effective
 
+        # Save rng state before noise so we can replay identical noise for mask
+        if return_mask:
+            noise_rng_state = rng.bit_generator.state
+
         # Generate clean trace and apply noise
         clean = generate_trace(params)
         noisy = apply_all_noise(clean, params, rng)
         bscan[pos] = noisy
 
-        # Compute mask for this position if requested
+        # Compute mask for this position if requested.
+        # Mask is built in the noised domain so it tracks jitter/dropout.
         if return_mask and best_defect is not None:
-            # Generate the defect echo in isolation to find its extent
-            params_defect_only = _copy_trace_params(params)
-            params_defect_only.has_defect = True
             params_nodefect = _copy_trace_params(params)
             params_nodefect.has_defect = False
             params_nodefect.defect_reflectivity = 0.0
-            trace_with = generate_trace(params_defect_only)
-            trace_without = generate_trace(params_nodefect)
-            defect_echo = trace_with - trace_without
+            params_nodefect.defect_depth_mm = 0.0
+            clean_nodefect = generate_trace(params_nodefect)
+            # Replay identical noise on no-defect trace
+            mask_rng = np.random.default_rng(0)
+            mask_rng.bit_generator.state = noise_rng_state
+            noisy_nodefect = apply_all_noise(clean_nodefect, params_nodefect, mask_rng)
+            defect_echo = noisy - noisy_nodefect
             peak = np.abs(defect_echo).max()
             if peak > 0:
                 mask[pos] = np.abs(defect_echo) > mask_threshold * peak
@@ -184,6 +198,7 @@ def generate_bscan_dataset(
         result = generate_synthetic_bscan(
             regime, rng, n_positions=n_positions,
             defects=None if has_defect else [],
+            defect_prob=1.0,  # honor flaw_ratio — no second coin flip
         )
         bscans.append(result.bscan)
         labels.append(result.label)
