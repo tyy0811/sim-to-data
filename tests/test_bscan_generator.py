@@ -161,6 +161,24 @@ class TestGenerateSyntheticBscan:
         )
         assert result.label == 0, "Defect without position_mm should be labeled 0"
 
+    def test_off_scan_defect_labeled_zero(self, source_regime):
+        """A defect positioned outside the scan range should be labeled 0."""
+        from simtodata.simulator.defects import DefectConfig
+        rng = np.random.default_rng(42)
+        defect = DefectConfig(
+            depth_mm=10.0, reflectivity=0.5, severity_label=2, position_mm=1000.0,
+        )
+        result = generate_synthetic_bscan(
+            source_regime, rng, n_positions=32, defects=[defect],
+        )
+        assert result.label == 0, "Off-scan defect should be labeled 0"
+        # B-scan should be identical to a no-defect scan with the same rng
+        rng2 = np.random.default_rng(42)
+        noflaw = generate_synthetic_bscan(
+            source_regime, rng2, n_positions=32, defects=[],
+        )
+        np.testing.assert_array_equal(result.bscan, noflaw.bscan)
+
 
 class TestGenerateBscanDataset:
     def test_shapes(self, source_regime):

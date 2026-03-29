@@ -108,11 +108,10 @@ def generate_synthetic_bscan(
         else:
             defects = []
 
-    # Only count defects that have a spatial position (can actually be rendered)
-    label = 1 if any(d.position_mm is not None for d in defects) else 0
     n_samples = base_params.n_samples
     bscan = np.zeros((n_positions, n_samples))
     mask = np.zeros((n_positions, n_samples), dtype=bool) if return_mask else None
+    any_defect_rendered = False
 
     for pos in range(n_positions):
         params = _copy_trace_params(base_params)
@@ -140,6 +139,7 @@ def generate_synthetic_bscan(
                 params.has_defect = True
                 params.defect_depth_mm = defect.depth_mm
                 params.defect_reflectivity = effective
+                any_defect_rendered = True
 
         # Save rng state before noise so we can replay identical noise for mask
         if return_mask:
@@ -167,6 +167,8 @@ def generate_synthetic_bscan(
             if peak > 0:
                 mask[pos] = np.abs(defect_echo) > mask_threshold * peak
 
+    # Label based on whether any defect actually contributed to the B-scan
+    label = 1 if any_defect_rendered else 0
     return BscanResult(bscan=bscan, label=label, mask=mask)
 
 
