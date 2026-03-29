@@ -28,6 +28,10 @@ class BscanDataset(Dataset):
     """
 
     def __init__(self, bscans: np.ndarray, labels: np.ndarray):
+        if len(bscans) != len(labels):
+            raise ValueError(
+                f"bscans and labels length mismatch: {len(bscans)} vs {len(labels)}"
+            )
         self.bscans = bscans.astype(np.float32)
         self.labels = labels.astype(np.int64)
 

@@ -3,6 +3,8 @@
 import numpy as np
 import torch
 
+import pytest
+
 from simtodata.data.bscan_dataset import BscanDataset, resize_bscan
 
 
@@ -51,3 +53,9 @@ class TestBscanDataset:
         for i in range(5):
             _, y = ds[i]
             assert y.item() == labels[i]
+
+    def test_mismatched_lengths_rejected(self):
+        with pytest.raises(ValueError, match="length mismatch"):
+            BscanDataset(np.zeros((2, 64, 64)), np.zeros(1))
+        with pytest.raises(ValueError, match="length mismatch"):
+            BscanDataset(np.zeros((1, 64, 64)), np.zeros(2))
