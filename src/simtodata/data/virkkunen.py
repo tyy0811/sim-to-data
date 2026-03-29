@@ -95,6 +95,11 @@ class VirkkunenLoader:
             if f.endswith(".bins"):
                 batch_uuids.add(f.replace(".bins", ""))
 
+        if not batch_uuids:
+            raise FileNotFoundError(
+                f"No .bins batch files found in {self.data_dir}"
+            )
+
         for uuid in sorted(batch_uuids):
             bscans, labels, _ = self.load_batch(uuid)
             all_bscans.append(bscans)

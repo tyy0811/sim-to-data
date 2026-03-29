@@ -88,6 +88,11 @@ class TestVirkkunenLoader:
         with pytest.raises(ValueError, match="channel must be in"):
             VirkkunenLoader(str(tmp_path), channel=-1)
 
+    def test_load_all_empty_dir_raises(self, tmp_path):
+        loader = VirkkunenLoader(str(tmp_path))
+        with pytest.raises(FileNotFoundError, match="No .bins batch files"):
+            loader.load_all()
+
     def test_metadata_count_aligned(self, tmp_path):
         """All three arrays should be truncated to the shortest."""
         # Create batch with 3 samples in .bins/.labels but only 2 in .jsons

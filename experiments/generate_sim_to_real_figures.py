@@ -44,11 +44,17 @@ def plot_synthetic_vs_real_bscans(save_path, config_path="configs/simulator.yaml
         axes[0, col].set_ylabel("Time (samples)")
 
     # Bottom row: real data if available, otherwise more synthetic
+    use_real = False
     if real_data_dir and os.path.isdir(real_data_dir):
         from simtodata.data.virkkunen import VirkkunenLoader
         loader = VirkkunenLoader(real_data_dir)
-        real_bscans, real_labels = loader.load_all()
+        try:
+            real_bscans, real_labels = loader.load_all()
+            use_real = True
+        except FileNotFoundError:
+            print(f"  No .bins files in {real_data_dir}, using synthetic fallback.")
 
+    if use_real:
         # Find one no-flaw, one flaw, one flaw
         noflaw_idx = np.where(real_labels == 0)[0]
         flaw_idx = np.where(real_labels == 1)[0]

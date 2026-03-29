@@ -232,36 +232,42 @@ def main():
     _save_result("SB3_bscan_randomized_on_shifted", sb3, args.output_dir)
 
     # --- SR1/SR2: Sim-to-Real (if real data available) ---
+    has_real = False
     if args.real_data_dir and os.path.isdir(args.real_data_dir):
         from simtodata.data.virkkunen import VirkkunenLoader
 
         print(f"\nLoading real data from {args.real_data_dir}...")
         loader = VirkkunenLoader(args.real_data_dir)
-        real_bscans, real_labels = loader.load_all()
-        print(f"  Loaded {len(real_labels)} samples "
-              f"(flaw: {(real_labels==1).sum()}, no-flaw: {(real_labels==0).sum()})")
+        try:
+            real_bscans, real_labels = loader.load_all()
+        except FileNotFoundError as e:
+            print(f"  Skipping SR1/SR2: {e}")
+        else:
+            has_real = True
+            print(f"  Loaded {len(real_labels)} samples "
+                  f"(flaw: {(real_labels==1).sum()}, no-flaw: {(real_labels==0).sum()})")
 
-        real_bscans_resized = _resize_batch(real_bscans, BSCAN_SHAPE)
-        real_ds = BscanDataset(real_bscans_resized, real_labels)
+            real_bscans_resized = _resize_batch(real_bscans, BSCAN_SHAPE)
+            real_ds = BscanDataset(real_bscans_resized, real_labels)
 
-        print("SR1: Eval source model on real data...")
-        sr1 = _evaluate(model_source, real_ds)
-        print(f"  SR1 F1={sr1['f1']:.3f}  AUROC={sr1['auroc']:.3f}")
-        _save_result("SR1_bscan_source_on_real", sr1, args.output_dir)
+            print("SR1: Eval source model on real data...")
+            sr1 = _evaluate(model_source, real_ds)
+            print(f"  SR1 F1={sr1['f1']:.3f}  AUROC={sr1['auroc']:.3f}")
+            _save_result("SR1_bscan_source_on_real", sr1, args.output_dir)
 
-        print("SR2: Eval randomized model on real data...")
-        sr2 = _evaluate(model_rand, real_ds)
-        print(f"  SR2 F1={sr2['f1']:.3f}  AUROC={sr2['auroc']:.3f}")
-        _save_result("SR2_bscan_randomized_on_real", sr2, args.output_dir)
-    else:
-        print("\nNo real data directory provided (--real-data-dir). "
-              "Skipping SR1/SR2 sim-to-real experiments.")
+            print("SR2: Eval randomized model on real data...")
+            sr2 = _evaluate(model_rand, real_ds)
+            print(f"  SR2 F1={sr2['f1']:.3f}  AUROC={sr2['auroc']:.3f}")
+            _save_result("SR2_bscan_randomized_on_real", sr2, args.output_dir)
+
+    if not has_real:
+        print("\nNo real data available. Skipping SR1/SR2 sim-to-real experiments.")
 
     # --- Summary ---
     print("\n=== Results Summary ===")
     for name, m in [("SB1", sb1), ("SB2", sb2), ("SB3", sb3)]:
         print(f"  {name}: F1={m['f1']:.3f}  AUROC={m['auroc']:.3f}")
-    if args.real_data_dir and os.path.isdir(args.real_data_dir):
+    if has_real:
         for name, m in [("SR1", sr1), ("SR2", sr2)]:
             print(f"  {name}: F1={m['f1']:.3f}  AUROC={m['auroc']:.3f}")
 
