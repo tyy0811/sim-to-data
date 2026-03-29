@@ -106,9 +106,59 @@ With 5 seeds, formal significance testing has limited statistical power. We repo
 
 Domain shift in sensor-based ML is studied in sim-to-real robotics (Tobin et al., 2017), medical imaging (Stacke et al., 2020), and theoretically via domain divergence bounds (Ben-David et al., 2010). This project applies domain randomization and supervised fine-tuning to synthetic ultrasonic inspection, testing whether these simple strategies suffice before reaching for more complex domain adaptation machinery (Ganin et al., 2016; Sun & Saenko, 2016).
 
+## Sim-to-Real Transfer (B-Scan)
+
+To test whether the synthetic pipeline transfers to real measurements,
+we adapt the 1D simulator to generate synthetic B-scans (stacking
+adjacent A-scans with a spatial defect model) and evaluate on real
+phased-array weld inspection data from Virkkunen et al. (2021).
+
+### Modality Gap
+
+The synthetic and real data come from fundamentally different setups:
+
+| | Synthetic | Real (Virkkunen) |
+|---|-----------|-----------------|
+| Mode | Longitudinal pulse-echo | TRS phased array (shear) |
+| Material | Generic metal | Austenitic 316L stainless steel weld |
+| Frequency | 1.5-7.0 MHz | 1.8 MHz |
+| Defect model | Point reflector | Thermal fatigue cracks |
+| Noise sources | Gaussian, drift, jitter, dropout | Grain noise, mode conversion |
+
+This is a **severe out-of-distribution stress test**, not a matched
+sim-to-real validation.
+
+<p align="center">
+  <img src="docs/figures/sim_vs_real_bscans.png" width="800"
+       alt="Synthetic vs real B-scan comparison">
+</p>
+
+### Results
+
+| Experiment | Train | Eval | F1 | AUROC |
+|-----------|-------|------|----|-------|
+| SB1 | Synthetic source | Synthetic source | 0.834 | 0.923 |
+| SB2 | Synthetic source | Synthetic shifted | 0.677 | 0.496 |
+| SB3 | Synthetic randomized | Synthetic shifted | 0.532 | 0.487 |
+| SR1 | Synthetic source | **Real** | 0.714 | 0.500 |
+| SR2 | Synthetic randomized | **Real** | 0.714 | 0.176 |
+
+<p align="center">
+  <img src="docs/figures/sim_to_real_results.png" width="600"
+       alt="Sim-to-real transfer results">
+</p>
+
+### Interpretation
+
+SB1 confirms the 2D CNN learns source-regime B-scans well (AUROC = 0.923). On shifted and real data, AUROC drops to ~0.5 (random) or below, meaning the models lose all discriminative ability. The inflated F1 values (0.68-0.71) reflect class imbalance: predicting all-flaw on a 55% flaw dataset yields F1 ~0.71 without any real discrimination.
+
+Domain randomization (SB3 vs SB2) does not rescue B-scan transfer in this setup, unlike the 1D A-scan results where it provided a +0.28 F1 gain. This likely reflects the 2D spatial structure: the Gaussian beam profile creates spatially coherent defect patterns that are easier for the CNN to memorize, but that spatial structure does not transfer across regimes.
+
+The real-data results (SR1/SR2 AUROC &le; 0.50) confirm the expected outcome: a simplified pulse-echo simulator cannot produce features that generalize to real TRS phased-array weld inspection. Bridging this gap would require physics-informed simulation of shear-wave propagation, realistic grain-noise models, and calibrated transducer beam profiles — none of which are in scope for this project.
+
 ## Honest Scope
 
-- All data is **purely synthetic** — the forward model is a simplified pulse-echo simulation, not a validated physics engine. Results demonstrate methodology, not field-ready performance.
+- Primary experiments use **synthetic data**. A sim-to-real stress test against real phased-array weld data (Virkkunen et al., 2021) is included. The extreme modality gap between the simplified pulse-echo simulator and real TRS phased-array inspection means this tests the limits of synthetic training, not its production readiness.
 - The "domain shift" is **controlled and parametric** — real-world shift involves corrosion, coupling variation, geometry changes, and other factors not modeled here.
 - **No domain adaptation methods** (DANN, MMD, etc.) are implemented. The study compares naive transfer, domain randomization, and supervised fine-tuning only.
 - The defect model is a **single point reflector** — real defects have complex geometries (cracks, porosity, delamination) that produce different echo patterns.
@@ -149,7 +199,7 @@ make clean           # Remove generated artifacts
 
 ## Engineering
 
-- **112 tests** across 14 test files
+- **152 tests** across 20 test files
 - **CI**: GitHub Actions (lint + test on Python 3.10)
 - **Reproducibility**: All experiment scripts seed PyTorch, NumPy, and DataLoader generators
 - **Lint**: ruff, line-length 100
