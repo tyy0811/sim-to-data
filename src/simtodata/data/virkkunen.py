@@ -34,6 +34,10 @@ class VirkkunenLoader:
     TIME = 256
 
     def __init__(self, data_dir: str, channel: int = 0):
+        if not 0 <= channel < self.CHANNELS:
+            raise ValueError(
+                f"channel must be in [0, {self.CHANNELS}), got {channel}"
+            )
         self.data_dir = data_dir
         self.channel = channel
 
@@ -74,8 +78,8 @@ class VirkkunenLoader:
         with open(jsons_path) as f:
             metadata = json.load(f)
 
-        # Align counts (use minimum in case of mismatch)
-        n = min(len(bscans), len(labels))
+        # Align counts across all three arrays
+        n = min(len(bscans), len(labels), len(metadata))
         return bscans[:n], labels[:n], metadata[:n]
 
     def load_all(self) -> tuple[np.ndarray, np.ndarray]:

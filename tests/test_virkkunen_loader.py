@@ -81,3 +81,20 @@ class TestVirkkunenLoader:
         bscans, _, _ = loader.load_batch("batch_ch")
         # Channel 5 data, normalized — just check shape is correct
         assert bscans.shape == (2, 256, 256)
+
+    def test_invalid_channel_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="channel must be in"):
+            VirkkunenLoader(str(tmp_path), channel=100)
+        with pytest.raises(ValueError, match="channel must be in"):
+            VirkkunenLoader(str(tmp_path), channel=-1)
+
+    def test_metadata_count_aligned(self, tmp_path):
+        """All three arrays should be truncated to the shortest."""
+        # Create batch with 3 samples in .bins/.labels but only 2 in .jsons
+        _make_fake_batch(str(tmp_path), "short_meta", n_samples=3)
+        jsons_path = os.path.join(str(tmp_path), "short_meta.jsons")
+        with open(jsons_path, "w") as f:
+            json.dump([{"sample": 0}, {"sample": 1}], f)
+        loader = VirkkunenLoader(str(tmp_path))
+        bscans, labels, metadata = loader.load_batch("short_meta")
+        assert len(bscans) == len(labels) == len(metadata) == 2
