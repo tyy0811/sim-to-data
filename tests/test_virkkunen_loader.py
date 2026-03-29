@@ -12,27 +12,25 @@ import pytest
 from simtodata.data.virkkunen import VirkkunenLoader
 
 
-def _make_fake_batch(tmpdir, uuid, n_samples=3, shape=(256, 256, 100)):
+def _make_fake_batch(tmpdir, uuid, n_samples=3, h=256, w=256):
     """Create a fake .bins/.labels/.jsons batch for testing."""
-    time, spatial, channels = shape
-
-    # .bins: UInt16 binary
-    data = np.random.randint(0, 65535, (n_samples, channels, spatial, time), dtype=np.uint16)
+    # .bins: UInt16 binary, N samples of h*w
+    data = np.random.randint(0, 65535, (n_samples, h, w), dtype=np.uint16)
     bins_path = os.path.join(tmpdir, f"{uuid}.bins")
     data.tofile(bins_path)
 
-    # .labels: one line per sample, "label\tinfo"
+    # .labels: one line per sample, "label\tsize"
     labels_path = os.path.join(tmpdir, f"{uuid}.labels")
     with open(labels_path, "w") as f:
         for i in range(n_samples):
             label = i % 2  # alternate 0, 1
-            f.write(f"{label}\tinfo\n")
+            f.write(f"{label}\t{0.5 * (i % 2)}\n")
 
-    # .jsons: list of metadata dicts
+    # .jsons: concatenated JSON objects (actual dataset format)
     jsons_path = os.path.join(tmpdir, f"{uuid}.jsons")
-    metadata = [{"sample": i, "flaw_size": 0.5 * (i % 2)} for i in range(n_samples)]
     with open(jsons_path, "w") as f:
-        json.dump(metadata, f)
+        for i in range(n_samples):
+            json.dump({"sample": i, "flaw_size": 0.5 * (i % 2)}, f)
 
     return data
 
@@ -42,8 +40,9 @@ class TestVirkkunenLoader:
         _make_fake_batch(str(tmp_path), "batch01", n_samples=4)
         loader = VirkkunenLoader(str(tmp_path))
         bscans, labels, metadata = loader.load_batch("batch01")
-        assert bscans.shape == (4, 256, 256)  # one channel extracted
+        assert bscans.shape == (4, 256, 256)
         assert len(labels) == 4
+        assert len(metadata) == 4
         assert bscans.dtype == np.float32
 
     def test_load_batch_labels_binary(self, tmp_path):
@@ -74,20 +73,6 @@ class TestVirkkunenLoader:
         bscans, _ = loader.load_all()
         assert np.all(np.isfinite(bscans))
 
-    def test_channel_selection(self, tmp_path):
-        """Verify that a specific channel can be extracted."""
-        data = _make_fake_batch(str(tmp_path), "batch_ch", n_samples=2)
-        loader = VirkkunenLoader(str(tmp_path), channel=5)
-        bscans, _, _ = loader.load_batch("batch_ch")
-        # Channel 5 data, normalized — just check shape is correct
-        assert bscans.shape == (2, 256, 256)
-
-    def test_invalid_channel_rejected(self, tmp_path):
-        with pytest.raises(ValueError, match="channel must be in"):
-            VirkkunenLoader(str(tmp_path), channel=100)
-        with pytest.raises(ValueError, match="channel must be in"):
-            VirkkunenLoader(str(tmp_path), channel=-1)
-
     def test_load_all_empty_dir_raises(self, tmp_path):
         loader = VirkkunenLoader(str(tmp_path))
         with pytest.raises(FileNotFoundError, match="No .bins batch files"):
@@ -95,11 +80,12 @@ class TestVirkkunenLoader:
 
     def test_metadata_count_aligned(self, tmp_path):
         """All three arrays should be truncated to the shortest."""
-        # Create batch with 3 samples in .bins/.labels but only 2 in .jsons
         _make_fake_batch(str(tmp_path), "short_meta", n_samples=3)
+        # Overwrite jsons with only 2 entries
         jsons_path = os.path.join(str(tmp_path), "short_meta.jsons")
         with open(jsons_path, "w") as f:
-            json.dump([{"sample": 0}, {"sample": 1}], f)
+            json.dump({"sample": 0}, f)
+            json.dump({"sample": 1}, f)
         loader = VirkkunenLoader(str(tmp_path))
         bscans, labels, metadata = loader.load_batch("short_meta")
         assert len(bscans) == len(labels) == len(metadata) == 2

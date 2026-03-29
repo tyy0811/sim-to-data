@@ -5,15 +5,16 @@ Paper: https://arxiv.org/abs/1903.11399
 License: LGPL-3.0
 
 Each batch file contains:
-  - .bins: UInt16 binary, each sample is (channels=100, spatial=256, time=256)
-  - .labels: one line per sample, "label<tab>info"
-  - .jsons: JSON array of per-sample metadata
+  - .bins: UInt16 binary, N samples of 256x256 (raw format: "UInt16, 256 x 256 x N")
+  - .labels: N lines, tab-separated: flaw_label (0/1) <tab> equivalent_flaw_size
+  - .jsons: N concatenated JSON objects with flaw metadata
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 
 import numpy as np
 
@@ -21,25 +22,19 @@ import numpy as np
 class VirkkunenLoader:
     """Load and normalize the Virkkunen ML-NDT dataset.
 
-    Extracts a single channel from the multi-channel phased-array data,
-    producing (spatial, time) B-scan images.
+    Each sample is a single-channel 256x256 B-scan image (phased-array
+    ultrasonic sector scan). Normalization is per-sample zero-mean,
+    unit-variance.
 
     Args:
         data_dir: Directory containing .bins/.labels/.jsons files.
-        channel: Which of the 100 channels to extract (default: 0).
     """
 
-    CHANNELS = 100
-    SPATIAL = 256
-    TIME = 256
+    H = 256
+    W = 256
 
-    def __init__(self, data_dir: str, channel: int = 0):
-        if not 0 <= channel < self.CHANNELS:
-            raise ValueError(
-                f"channel must be in [0, {self.CHANNELS}), got {channel}"
-            )
+    def __init__(self, data_dir: str):
         self.data_dir = data_dir
-        self.channel = channel
 
     def load_batch(self, batch_uuid: str) -> tuple[np.ndarray, list[int], list[dict]]:
         """Load one batch file.
@@ -47,39 +42,52 @@ class VirkkunenLoader:
         Returns:
             bscans: (N, 256, 256) float32 array, zero-mean unit-variance per sample.
             labels: list of int (0=no flaw, 1=flaw).
-            metadata: list of dicts from .jsons.
+            metadata: list of dicts from .jsons (best-effort; empty list on parse failure).
         """
         bins_path = os.path.join(self.data_dir, f"{batch_uuid}.bins")
         labels_path = os.path.join(self.data_dir, f"{batch_uuid}.labels")
         jsons_path = os.path.join(self.data_dir, f"{batch_uuid}.jsons")
 
-        # Read binary: UInt16, each sample is (channels, spatial, time)
+        # Read binary: UInt16, each sample is H*W values
         raw = np.fromfile(bins_path, dtype=np.uint16)
-        sample_size = self.CHANNELS * self.SPATIAL * self.TIME
+        sample_size = self.H * self.W
         n_samples = len(raw) // sample_size
-        volumes = raw[:n_samples * sample_size].reshape(
-            n_samples, self.CHANNELS, self.SPATIAL, self.TIME,
-        )
-
-        # Extract one channel -> (N, spatial, time)
-        bscans = volumes[:, self.channel, :, :].astype(np.float32)
+        bscans = raw[:n_samples * sample_size].reshape(
+            n_samples, self.H, self.W,
+        ).astype(np.float32)
 
         # Per-sample normalization: zero-mean, unit-variance
         for i in range(len(bscans)):
             std = bscans[i].std()
             bscans[i] = (bscans[i] - bscans[i].mean()) / (std + 1e-10)
 
-        # Read labels
-        with open(labels_path) as f:
-            label_lines = f.readlines()
-        labels = [int(line.strip().split("\t")[0]) for line in label_lines if line.strip()]
+        # Read labels: first column is 0/1 flaw indicator
+        labels = []
+        if os.path.exists(labels_path):
+            with open(labels_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        labels.append(int(line.split("\t")[0]))
 
-        # Read metadata
-        with open(jsons_path) as f:
-            metadata = json.load(f)
+        # Read metadata: concatenated JSON objects (not a JSON array)
+        metadata = []
+        if os.path.exists(jsons_path):
+            try:
+                with open(jsons_path) as f:
+                    text = f.read()
+                # Split concatenated JSON objects: insert comma between }{ pairs
+                text = re.sub(r'\}\s*\{', '},{', text)
+                metadata = json.loads(f'[{text}]')
+            except (json.JSONDecodeError, ValueError):
+                metadata = []
 
-        # Align counts across all three arrays
-        n = min(len(bscans), len(labels), len(metadata))
+        # Align counts across all arrays
+        n = min(len(bscans), len(labels)) if labels else len(bscans)
+        if metadata:
+            n = min(n, len(metadata))
+        else:
+            metadata = [{}] * n
         return bscans[:n], labels[:n], metadata[:n]
 
     def load_all(self) -> tuple[np.ndarray, np.ndarray]:
