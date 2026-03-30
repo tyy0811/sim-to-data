@@ -62,13 +62,16 @@ class VirkkunenLoader:
             bscans[i] = (bscans[i] - bscans[i].mean()) / (std + 1e-10)
 
         # Read labels: first column is 0/1 flaw indicator
+        if not os.path.exists(labels_path):
+            raise FileNotFoundError(
+                f"Missing labels file for batch {batch_uuid}: {labels_path}"
+            )
         labels = []
-        if os.path.exists(labels_path):
-            with open(labels_path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        labels.append(int(line.split("\t")[0]))
+        with open(labels_path) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    labels.append(int(line.split("\t")[0]))
 
         # Read metadata: concatenated JSON objects (not a JSON array)
         metadata = []
@@ -83,7 +86,7 @@ class VirkkunenLoader:
                 metadata = []
 
         # Align counts across all arrays
-        n = min(len(bscans), len(labels)) if labels else len(bscans)
+        n = min(len(bscans), len(labels))
         if metadata:
             n = min(n, len(metadata))
         else:

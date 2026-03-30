@@ -78,6 +78,14 @@ class TestVirkkunenLoader:
         with pytest.raises(FileNotFoundError, match="No .bins batch files"):
             loader.load_all()
 
+    def test_missing_labels_raises(self, tmp_path):
+        """A .bins without a matching .labels should fail fast."""
+        data = np.zeros((2, 256, 256), dtype=np.uint16)
+        data.tofile(str(tmp_path / "orphan.bins"))
+        loader = VirkkunenLoader(str(tmp_path))
+        with pytest.raises(FileNotFoundError, match="Missing labels file"):
+            loader.load_batch("orphan")
+
     def test_metadata_count_aligned(self, tmp_path):
         """All three arrays should be truncated to the shortest."""
         _make_fake_batch(str(tmp_path), "short_meta", n_samples=3)
