@@ -57,14 +57,14 @@ Low-severity defects remain the hardest class across all conditions — the safe
 
 ### Attribution Analysis (Grad-CAM)
 
-Grad-CAM attributions show where the 1D CNN attends when classifying A-scan traces. On source data (B1), attribution peaks align with the defect echo arrival region. Under domain shift (B2), attention drifts toward noise and back-wall artifacts — explaining the per-class recall collapse in the confusion matrices above. Domain randomization with fine-tuning (B5) partially recovers attention to the defect region.
+Grad-CAM attributions show where the 1D CNN attends when classifying A-scan traces. On source data (B1), attribution concentrates in the early-sample region where defect echoes arrive. Under domain shift (B2), attention becomes diffuse across the trace. Domain randomization with fine-tuning (B5) produces a stronger early peak than B2, but attention remains spread across the full trace rather than cleanly re-localizing.
 
 <p align="center">
   <img src="docs/figures/gradcam_grid.png" width="800" alt="Grad-CAM attribution grid: B1 source, B2 shifted, B5 shifted for flaw and no-flaw samples">
   <br><em>Representative samples (seed=42). Signal in gray, Grad-CAM attribution overlaid in color.</em>
 </p>
 
-The mean attribution profile averaged over 50 high-severity flaw samples confirms the pattern quantitatively: B1's attention peak (blue) sits on the defect echo, B2's (orange) is diffuse, and B5's (green) partially recovers.
+The mean attribution profile averaged over 50 high-severity flaw samples shows the same pattern: B1 (blue) peaks sharply in the early-sample region, B2 (orange) is low and diffuse, and B5 (green) peaks early but retains elevated attention across the trace.
 
 <p align="center">
   <img src="docs/figures/gradcam_mean_profile.png" width="700" alt="Mean Grad-CAM attribution profile for B1, B2, B5 over 50 flaw samples">
