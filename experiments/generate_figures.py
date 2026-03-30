@@ -2,6 +2,8 @@
 
 import json
 import os
+import subprocess
+import sys
 
 import numpy as np
 import matplotlib
@@ -188,6 +190,18 @@ def main():
 
     print("Plotting calibration diagram...")
     plot_calibration_diagram("docs/figures/calibration_diagram.png")
+
+    # Grad-CAM attribution figures (requires trained B1/B5 checkpoints)
+    b1_path = "models/B1_cnn1d_source.pt"
+    b5_path = "models/B5_cnn1d_randomized_finetuned.pt"
+    if os.path.exists(b1_path) and os.path.exists(b5_path):
+        print("Generating Grad-CAM attribution figures...")
+        subprocess.run(
+            [sys.executable, "experiments/generate_gradcam_figures.py"],
+            check=True,
+        )
+    else:
+        print("Skipping Grad-CAM figures (B1/B5 checkpoints not found).")
 
     print("All figures generated.")
 

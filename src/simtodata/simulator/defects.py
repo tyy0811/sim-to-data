@@ -14,6 +14,7 @@ class DefectConfig:
     depth_mm: float
     reflectivity: float
     severity_label: int
+    position_mm: float | None = None  # B-scan spatial position; None for 1D A-scans
 
 
 def classify_severity(reflectivity: float) -> int:

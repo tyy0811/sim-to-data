@@ -40,8 +40,8 @@ Variance reflects training randomness (initialization, batch order) on a fixed d
 
 - **Shift hurts consistently**: B1 → B2 shows a &Delta; = -0.57 F1 drop; all 5 B2 runs fall below all 5 B1 runs (no overlap in observed ranges).
 - **Randomization helps reliably**: B3 (0.542 ± 0.004) vs B2 (0.265 ± 0.011) — a stable +0.28 improvement with low variance.
-- **Fine-tuning preserves gains**: B5 (0.550 ± 0.005) &asymp; B3 (0.542 ± 0.004) — 200 adaptation samples do not degrade randomized performance.
-- **CNN justified**: B1 (0.837 ± 0.006) >> B0b (0.510) on source.
+- **Fine-tuning does not materially improve or degrade randomized performance**: B5 (0.550 ± 0.005) &asymp; B3 (0.542 ± 0.004) at 200 adaptation samples.
+- **CNN justified**: The CNN substantially outperforms hand-crafted baselines on source data (B1 = 0.837 vs B0b = 0.510), justifying learned waveform features before transfer is considered.
 - **Calibration**: B3/B5 have ECE &le; 0.10 while B2 has ECE = 0.61 — domain randomization produces better-calibrated models.
 
 ### Failure Mode Analysis
@@ -54,6 +54,23 @@ Low-severity defects remain the hardest class across all conditions — the safe
   <img src="docs/figures/confusion_matrices.png" width="800" alt="Confusion matrices for B1, B2, and B5 showing per-class recall under domain shift">
   <br><em>Representative seed (seed=42). Per-class recalls are consistent across all 5 training seeds.</em>
 </p>
+
+### Attribution Analysis (Grad-CAM)
+
+Grad-CAM attributions show where the 1D CNN attends when classifying A-scan traces. On source data (B1), attribution concentrates in the early-sample region where defect echoes arrive. Under domain shift (B2), attention becomes diffuse across the trace. Domain randomization with fine-tuning (B5) produces a stronger early peak than B2, but attention remains spread across the full trace rather than cleanly re-localizing.
+
+<p align="center">
+  <img src="docs/figures/gradcam_grid.png" width="800" alt="Grad-CAM attribution grid: B1 source, B2 shifted, B5 shifted for flaw and no-flaw samples">
+  <br><em>Representative samples (seed=42). Signal in gray, Grad-CAM attribution overlaid in color.</em>
+</p>
+
+The mean attribution profile averaged over 50 high-severity flaw samples shows the same pattern: B1 (blue) peaks sharply in the early-sample region, B2 (orange) is low and diffuse, and B5 (green) peaks early but retains elevated attention across the trace.
+
+<p align="center">
+  <img src="docs/figures/gradcam_mean_profile.png" width="700" alt="Mean Grad-CAM attribution profile for B1, B2, B5 over 50 flaw samples">
+</p>
+
+These are qualitative diagnostics showing where the model attends, not proof of learned physical reasoning.
 
 ### Calibration
 
@@ -106,9 +123,22 @@ With 5 seeds, formal significance testing has limited statistical power. We repo
 
 Domain shift in sensor-based ML is studied in sim-to-real robotics (Tobin et al., 2017), medical imaging (Stacke et al., 2020), and theoretically via domain divergence bounds (Ben-David et al., 2010). This project applies domain randomization and supervised fine-tuning to synthetic ultrasonic inspection, testing whether these simple strategies suffice before reaching for more complex domain adaptation machinery (Ganin et al., 2016; Sun & Saenko, 2016).
 
+## Stress Test: Synthetic B-Scans vs Real Phased-Array Data
+
+As an extension, we generate synthetic 2D B-scans and evaluate against real phased-array weld inspection data from Virkkunen et al. (2021). The modality gap is extreme (pulse-echo vs TRS shear-wave, point reflectors vs thermal fatigue cracks), making this an intentional stress test, not a matched sim-to-real validation.
+
+**Result**: The 2D CNN learns source B-scans well (AUROC = 0.923) but has zero discriminative ability on real data (AUROC &le; 0.50). Unlike the 1D setting, domain randomization does not help — the randomized model learns features that are anti-correlated with real defect presence (AUROC = 0.176). This confirms that bridging the sim-to-real gap requires substantially more realistic physics simulation than the current forward model provides.
+
+<p align="center">
+  <img src="docs/figures/sim_vs_real_bscans.png" width="800"
+       alt="Synthetic vs real B-scan comparison">
+</p>
+
+Full analysis and reproduction instructions: **[docs/sim_to_real.md](docs/sim_to_real.md)**
+
 ## Honest Scope
 
-- All data is **purely synthetic** — the forward model is a simplified pulse-echo simulation, not a validated physics engine. Results demonstrate methodology, not field-ready performance.
+- Primary experiments use **purely synthetic data**. A [stress test against real phased-array weld data](docs/sim_to_real.md) (Virkkunen et al., 2021) is included as an extension; the extreme modality gap confirms the simulator's limits, not production readiness.
 - The "domain shift" is **controlled and parametric** — real-world shift involves corrosion, coupling variation, geometry changes, and other factors not modeled here.
 - **No domain adaptation methods** (DANN, MMD, etc.) are implemented. The study compares naive transfer, domain randomization, and supervised fine-tuning only.
 - The defect model is a **single point reflector** — real defects have complex geometries (cracks, porosity, delamination) that produce different echo patterns.
@@ -149,7 +179,7 @@ make clean           # Remove generated artifacts
 
 ## Engineering
 
-- **112 tests** across 14 test files
+- **152 tests** across 20 test files
 - **CI**: GitHub Actions (lint + test on Python 3.10)
 - **Reproducibility**: All experiment scripts seed PyTorch, NumPy, and DataLoader generators
 - **Lint**: ruff, line-length 100
