@@ -150,11 +150,13 @@ sim-to-real validation.
 
 ### Interpretation
 
-SB1 confirms the 2D CNN learns source-regime B-scans well (AUROC = 0.923). On shifted and real data, AUROC drops to ~0.5 (random) or below, meaning the models lose all discriminative ability. The inflated F1 values (0.68-0.71) reflect class imbalance: predicting all-flaw on a 55% flaw dataset yields F1 ~0.71 without any real discrimination.
+SB1 confirms the 2D CNN learns source-regime B-scans well (AUROC = 0.923). On shifted and real data, AUROC drops to &le; 0.5, meaning the models lose all discriminative ability. The elevated F1 values (0.68-0.71) are misleading: they reflect class imbalance, not real discrimination. Predicting all-flaw on a 55% flaw dataset yields F1 &asymp; 0.71 with zero information content.
 
-Domain randomization (SB3 vs SB2) does not rescue B-scan transfer in this setup, unlike the 1D A-scan results where it provided a +0.28 F1 gain. This likely reflects the 2D spatial structure: the Gaussian beam profile creates spatially coherent defect patterns that are easier for the CNN to memorize, but that spatial structure does not transfer across regimes.
+SB3's AUROC of 0.487 is below 0.5, meaning the randomized model has learned features that are anti-correlated with defect presence under the shifted regime — a failure mode distinct from random guessing. Domain randomization does not rescue B-scan transfer in this setup, unlike the 1D A-scan results where it provided a +0.28 F1 gain. This likely reflects the 2D spatial structure: the Gaussian beam profile creates spatially coherent defect patterns that are easier for the CNN to memorize, but that spatial structure does not transfer across regimes.
 
-The real-data results (SR1/SR2 AUROC &le; 0.50) confirm the expected outcome: a simplified pulse-echo simulator cannot produce features that generalize to real TRS phased-array weld inspection. Bridging this gap would require physics-informed simulation of shear-wave propagation, realistic grain-noise models, and calibrated transducer beam profiles — none of which are in scope for this project.
+SR1 (AUROC = 0.500) predicts P(flaw) &asymp; 1.0 for every real sample — the model is maximally confident and entirely uninformative. SR2 (AUROC = 0.176) is worse: the randomized model assigns *higher* P(flaw) to real no-flaw samples than to real flaw samples, meaning its confidence is systematically inverted on real data. This is not a label alignment bug (verified: both datasets encode flaw=1 consistently). The model has learned synthetic features that are genuinely anti-predictive on real phased-array weld data.
+
+Bridging this gap would require physics-informed simulation of shear-wave propagation, realistic grain-noise models, and calibrated transducer beam profiles — none of which are in scope for this project.
 
 ## Honest Scope
 
