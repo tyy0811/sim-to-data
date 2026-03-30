@@ -86,6 +86,14 @@ class TestVirkkunenLoader:
         with pytest.raises(FileNotFoundError, match="Missing labels file"):
             loader.load_batch("orphan")
 
+    def test_empty_labels_raises(self, tmp_path):
+        """A .bins with an empty .labels should fail fast."""
+        np.zeros((2, 256, 256), dtype=np.uint16).tofile(str(tmp_path / "empty.bins"))
+        (tmp_path / "empty.labels").write_text("")
+        loader = VirkkunenLoader(str(tmp_path))
+        with pytest.raises(ValueError, match="Labels file is empty"):
+            loader.load_batch("empty")
+
     def test_metadata_count_aligned(self, tmp_path):
         """All three arrays should be truncated to the shortest."""
         _make_fake_batch(str(tmp_path), "short_meta", n_samples=3)

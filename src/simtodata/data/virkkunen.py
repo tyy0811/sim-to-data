@@ -72,6 +72,10 @@ class VirkkunenLoader:
                 line = line.strip()
                 if line:
                     labels.append(int(line.split("\t")[0]))
+        if not labels:
+            raise ValueError(
+                f"Labels file is empty for batch {batch_uuid}: {labels_path}"
+            )
 
         # Read metadata: concatenated JSON objects (not a JSON array)
         metadata = []
