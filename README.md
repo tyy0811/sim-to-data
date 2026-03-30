@@ -40,7 +40,8 @@ Variance reflects training randomness (initialization, batch order) on a fixed d
 
 - **Shift hurts consistently**: B1 → B2 shows a &Delta; = -0.57 F1 drop; all 5 B2 runs fall below all 5 B1 runs (no overlap in observed ranges).
 - **Randomization helps reliably**: B3 (0.542 ± 0.004) vs B2 (0.265 ± 0.011) — a stable +0.28 improvement with low variance.
-- **Fine-tuning does not materially improve or degrade randomized performance**: B5 (0.550 ± 0.005) &asymp; B3 (0.542 ± 0.004) at 200 adaptation samples.
+- **Fine-tuning cannot recover from poor initialization**: B4 (source-pretrained + fine-tune, 0.368) underperforms B3 (randomized, no fine-tune, 0.542). The source model's features are too specialized to the source regime for 200 adaptation samples to repair.
+- **Fine-tuning does not materially improve randomized performance**: B5 (0.550 ± 0.005) &asymp; B3 (0.542 ± 0.004) at 200 adaptation samples.
 - **CNN justified**: The CNN substantially outperforms hand-crafted baselines on source data (B1 = 0.837 vs B0b = 0.510), justifying learned waveform features before transfer is considered.
 - **Calibration**: B3/B5 have ECE &le; 0.10 while B2 has ECE = 0.61 — domain randomization produces better-calibrated models.
 
@@ -111,7 +112,7 @@ Robustness and adaptation results below are from a single representative seed (s
 | 100 | 0.362 | 0.539 |
 | 200 | 0.353 | 0.547 |
 
-Fine-tuning the source-pretrained model plateaus at F1 &asymp; 0.37 regardless of sample count (25-200), while the randomized model starts at 0.54 — domain randomization cannot be replaced by more target labels at this scale.
+Fine-tuning the source-pretrained model plateaus at F1 &asymp; 0.37 regardless of sample count (25-200) and slightly *decreases* from 50 to 200 samples, likely due to overfitting on a small fine-tune set drawn from a distribution the model's features are poorly suited for. The randomized model starts at 0.54 with zero target labels — domain randomization cannot be replaced by more target labels at this scale.
 
 ## Statistical Methodology
 
@@ -119,22 +120,21 @@ CNN experiments (B1-B5) are repeated across 5 random seeds controlling model ini
 
 With 5 seeds, formal significance testing has limited statistical power. We report effect sizes and consistency across runs rather than p-values. All 5 B3 runs individually outperform all 5 B2 runs (no overlap), providing strong qualitative evidence for the randomization effect.
 
-## Context
+## Related Work
 
-Domain shift in sensor-based ML is studied in sim-to-real robotics (Tobin et al., 2017), medical imaging (Stacke et al., 2020), and theoretically via domain divergence bounds (Ben-David et al., 2010). This project applies domain randomization and supervised fine-tuning to synthetic ultrasonic inspection, testing whether these simple strategies suffice before reaching for more complex domain adaptation machinery (Ganin et al., 2016; Sun & Saenko, 2016).
+Domain randomization was shown to bridge the sim-to-real gap in robotics (Tobin et al., 2017) and has theoretical grounding in domain divergence bounds (Ben-David et al., 2010). This project tests whether the same strategy transfers to ultrasonic inspection, where the shift is parametric (sensor/material variation) rather than visual. The results suggest randomization is effective for moderate parametric shift (B3 vs B2) but breaks down when the modality gap is too large (the [B-scan stress test](#stress-test-synthetic-b-scans-vs-real-phased-array-data)), consistent with findings in medical imaging that simple augmentation cannot bridge fundamental domain differences (Stacke et al., 2020).
 
 ## Stress Test: Synthetic B-Scans vs Real Phased-Array Data
 
-As an extension, we generate synthetic 2D B-scans and evaluate against real phased-array weld inspection data from Virkkunen et al. (2021). The modality gap is extreme (pulse-echo vs TRS shear-wave, point reflectors vs thermal fatigue cracks), making this an intentional stress test, not a matched sim-to-real validation.
+As an extension, we evaluate synthetic 2D B-scans against real phased-array weld inspection data from Virkkunen et al. (2021). The modality gap is extreme (pulse-echo vs TRS shear-wave, point reflectors vs thermal fatigue cracks).
 
-**Result**: The 2D CNN learns source B-scans well (AUROC = 0.923) but has zero discriminative ability on real data (AUROC &le; 0.50). Unlike the 1D setting, domain randomization does not help — the randomized model learns features that are anti-correlated with real defect presence (AUROC = 0.176). This confirms that bridging the sim-to-real gap requires substantially more realistic physics simulation than the current forward model provides.
+| Experiment | Eval | AUROC |
+|-----------|------|-------|
+| SB1 (source &rarr; source) | Synthetic | 0.923 |
+| SR1 (source &rarr; real) | **Real** | 0.500 |
+| SR2 (randomized &rarr; real) | **Real** | 0.176 |
 
-<p align="center">
-  <img src="docs/figures/sim_vs_real_bscans.png" width="800"
-       alt="Synthetic vs real B-scan comparison">
-</p>
-
-Full analysis and reproduction instructions: **[docs/sim_to_real.md](docs/sim_to_real.md)**
+**Verdict**: The model learns synthetic B-scans well but has zero discriminative ability on real data. Domain randomization does not help — it produces features that are anti-correlated with real defect presence. Full analysis: **[docs/sim_to_real.md](docs/sim_to_real.md)**
 
 ## Honest Scope
 
@@ -179,7 +179,7 @@ make clean           # Remove generated artifacts
 
 ## Engineering
 
-- **152 tests** across 20 test files
+- **167 tests** across 20 test files
 - **CI**: GitHub Actions (lint + test on Python 3.10)
 - **Reproducibility**: All experiment scripts seed PyTorch, NumPy, and DataLoader generators
 - **Lint**: ruff, line-length 100

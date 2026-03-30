@@ -52,11 +52,11 @@ Unlike the 1D A-scan experiments, where synthetic randomization provided a +0.28
 
 ### Real-data results
 
-SR1 (AUROC = 0.500) predicts P(flaw) &asymp; 1.0 for every real sample — the model is maximally confident and entirely uninformative. SR2 (AUROC = 0.176) is worse: the randomized model assigns *higher* P(flaw) to real no-flaw samples than to real flaw samples, meaning its confidence is systematically inverted on real data. This is not a label alignment bug (verified: both datasets encode flaw=1 consistently). The model has learned synthetic features that are genuinely anti-predictive on real phased-array weld data.
+SR1 (AUROC = 0.500) predicts flaw for all 200 real samples (accuracy = 111/200 = 0.555, exactly matching the flaw prevalence), meaning the model outputs near-certain P(flaw) regardless of input — maximally confident and entirely uninformative. SR2 (AUROC = 0.176) is worse: the randomized model assigns *higher* P(flaw) to real no-flaw samples than to real flaw samples, meaning its confidence is systematically inverted on real data. This is not a label alignment bug (verified: both datasets encode flaw=1 consistently). The model has learned synthetic features that are genuinely anti-predictive on real phased-array weld data.
 
 ### What would be needed
 
-Bridging this gap would require physics-informed simulation of shear-wave propagation, realistic grain-noise models, and calibrated transducer beam profiles — none of which are in scope for this project.
+Bridging this gap would require physics-informed simulation of shear-wave propagation (e.g., CIVA or OpenCOSSAN for ray-tracing through anisotropic weld microstructure), realistic grain-noise models (Thompson & Margetan, 2002), and calibrated phased-array beam profiles — none of which are in scope for this project. The gap is architectural, not tunable: no amount of domain randomization over the current forward model's parameter space can produce signals that resemble phased-array shear-wave data.
 
 ## Running the Experiments
 
