@@ -53,3 +53,34 @@ class TestGradcam1d:
         gradcam_1d(model, x, target_class=0, target_layer=layer)
         assert len(layer._forward_hooks) == 0
         assert len(layer._backward_hooks) == 0
+
+
+from simtodata.evaluation.interpretability import compute_attribution_batch
+
+
+class TestComputeAttributionBatch:
+    def test_returns_expected_keys(self):
+        model, layer = _get_model_and_layer()
+        # Create a tiny fake dataset
+        from torch.utils.data import TensorDataset
+        signals = torch.randn(10, 1, 1024)
+        labels = torch.randint(0, 3, (10,))
+        dataset = TensorDataset(signals, labels)
+        result = compute_attribution_batch(model, dataset, layer, n_samples=5, seed=42)
+        assert set(result.keys()) == {"signals", "attributions", "labels", "predictions"}
+        assert result["signals"].shape == (5, 1024)
+        assert result["attributions"].shape == (5, 1024)
+        assert result["labels"].shape == (5,)
+        assert result["predictions"].shape == (5,)
+
+    def test_attributions_normalized(self):
+        model, layer = _get_model_and_layer()
+        from torch.utils.data import TensorDataset
+        signals = torch.randn(10, 1, 1024)
+        labels = torch.randint(0, 3, (10,))
+        dataset = TensorDataset(signals, labels)
+        result = compute_attribution_batch(model, dataset, layer, n_samples=5, seed=42)
+        for i in range(5):
+            cam = result["attributions"][i]
+            assert cam.min() >= 0.0
+            assert abs(cam.max() - 1.0) < 1e-6, f"Sample {i} max={cam.max()}"
