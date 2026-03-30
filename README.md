@@ -112,7 +112,12 @@ As an extension, we generate synthetic 2D B-scans and evaluate against real phas
 
 **Result**: The 2D CNN learns source B-scans well (AUROC = 0.923) but has zero discriminative ability on real data (AUROC &le; 0.50). Unlike the 1D setting, domain randomization does not help — the randomized model learns features that are anti-correlated with real defect presence (AUROC = 0.176). This confirms that bridging the sim-to-real gap requires substantially more realistic physics simulation than the current forward model provides.
 
-Full analysis, figures, and reproduction instructions: **[docs/sim_to_real.md](docs/sim_to_real.md)**
+<p align="center">
+  <img src="docs/figures/sim_vs_real_bscans.png" width="800"
+       alt="Synthetic vs real B-scan comparison">
+</p>
+
+Full analysis and reproduction instructions: **[docs/sim_to_real.md](docs/sim_to_real.md)**
 
 ## Honest Scope
 
