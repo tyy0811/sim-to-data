@@ -5,6 +5,7 @@ Figure B: Mean attribution profile (B1/B2/B5 averaged over 50 flaw samples)
 """
 
 import argparse
+import logging
 import os
 
 import numpy as np
@@ -15,8 +16,10 @@ import matplotlib.pyplot as plt
 
 from simtodata.data.dataset import InspectionDataset
 from simtodata.data.transforms import Normalize
-from simtodata.evaluation.interpretability import gradcam_1d, compute_attribution_batch
+from simtodata.evaluation.interpretability import gradcam_1d
 from simtodata.models.cnn1d import DefectCNN1D
+
+logger = logging.getLogger(__name__)
 
 
 def _load_model(path):
@@ -76,6 +79,12 @@ def _find_sample(dataset, severity, model, target_layer, correct=True, seed=42):
             return x.squeeze().numpy(), y.item(), pred, cam
 
     # Fallback: return first matching severity regardless of correctness
+    logger.warning(
+        "No %s sample found for severity=%d; falling back to any "
+        "correctness. Panel may not show intended behavior.",
+        "correctly classified" if correct else "misclassified",
+        severity,
+    )
     for idx in indices:
         x, y = dataset[idx]
         if y.item() != severity:
