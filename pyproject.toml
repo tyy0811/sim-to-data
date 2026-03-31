@@ -18,6 +18,9 @@ dev = [
     "pytest>=7.0",
     "ruff>=0.1.0",
 ]
+export = [
+    "onnxruntime>=1.16",
+]
 
 [build-system]
 requires = ["setuptools>=68.0"]
