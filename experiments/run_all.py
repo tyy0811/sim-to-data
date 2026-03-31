@@ -37,6 +37,12 @@ def main():
     run(f"experiments/run_adaptation_curve.py{quick_flag}", "Running adaptation curve")
     run("experiments/generate_figures.py", "Generating figures")
 
+    # V3: Deployment readiness analysis
+    run("experiments/run_conformal.py", "Running conformal selective prediction")
+    run("experiments/run_cost_analysis.py", "Running cost-sensitive analysis")
+    run(f"experiments/run_coral.py{quick_flag}", "Running CORAL adaptation baseline")
+    run("experiments/generate_v3_figures.py", "Generating V3 figures")
+
     print("\n" + "=" * 60)
     print("  PIPELINE COMPLETE")
     print("=" * 60)
