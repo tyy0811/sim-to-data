@@ -271,7 +271,7 @@ make clean           # Remove generated artifacts
 
 ## Engineering
 
-- **187 tests** across 24 test files (including conformal, cost, CORAL, and ONNX export tests)
+- **193 tests** across 24 test files (including conformal, cost, CORAL, and ONNX export tests)
 - **CI**: GitHub Actions (lint + test on Python 3.10)
 - **Reproducibility**: All experiment scripts seed PyTorch, NumPy, and DataLoader generators
 - **Lint**: ruff, line-length 100
