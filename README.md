@@ -262,6 +262,7 @@ make train-baselines # Run B0a-B0c baselines
 make train-cnn       # Run B1-B5 CNN experiments
 make evaluate        # Run robustness + adaptation sweeps
 make figures         # Generate all figures
+make v3              # Run V3 analysis (conformal, cost, CORAL, V3 figures)
 make all             # Full pipeline
 make test            # Run test suite
 make lint            # Ruff lint check
