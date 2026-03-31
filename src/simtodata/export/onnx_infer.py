@@ -1,12 +1,15 @@
 """Batch inference with ONNX model.
 
 Usage:
-    python -m simtodata.export.onnx_infer \\
-        --model models/best_B5.onnx \\
+    python -m simtodata.export.onnx_infer \
+        --model models/best_B5.onnx \
         --input data/sample_batch.npy
 """
 
 from __future__ import annotations
+
+import argparse
+import json
 
 import numpy as np
 
@@ -40,3 +43,15 @@ def run_inference(onnx_path: str, traces: np.ndarray) -> dict:
         "latency_ms": round(elapsed_ms, 2),
         "latency_per_sample_ms": round(elapsed_ms / len(traces), 4),
     }
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="ONNX batch inference")
+    parser.add_argument("--model", required=True, help="Path to .onnx model")
+    parser.add_argument("--input", required=True, help="Path to .npy traces (N,1,L)")
+    args = parser.parse_args()
+
+    traces = np.load(args.input)
+    result = run_inference(args.model, traces)
+
+    print(json.dumps({k: v for k, v in result.items() if k != "probabilities"}, indent=2))

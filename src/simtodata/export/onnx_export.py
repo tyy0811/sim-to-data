@@ -1,15 +1,22 @@
 """Export trained CNN to ONNX for deployable inference.
 
 Usage:
-    python -m simtodata.export.onnx_export \\
-        --checkpoint models/best_B5.pt \\
+    python -m simtodata.export.onnx_export \
+        --checkpoint models/best_B5.pt \
         --output models/best_B5.onnx
 """
 
 from __future__ import annotations
 
+import argparse
+
 import numpy as np
 import torch
+
+
+def _model_device(model: torch.nn.Module) -> torch.device:
+    """Infer device from first model parameter."""
+    return next(model.parameters()).device
 
 
 def export_to_onnx(
@@ -21,7 +28,7 @@ def export_to_onnx(
     """Export PyTorch model to ONNX.
 
     Args:
-        model: trained CNN in eval mode.
+        model: trained CNN (any device — moved to CPU for export).
         output_path: where to save .onnx file.
         trace_length: input A-scan length (default 1024).
         opset_version: ONNX opset version.
@@ -29,7 +36,7 @@ def export_to_onnx(
     Returns:
         output_path.
     """
-    model.eval()
+    model = model.cpu().eval()
     dummy_input = torch.randn(1, 1, trace_length)
 
     torch.onnx.export(
@@ -57,7 +64,7 @@ def verify_onnx(
     """Verify ONNX output matches PyTorch within tolerance.
 
     Args:
-        model: PyTorch model in eval mode.
+        model: PyTorch model (any device — moved to CPU for comparison).
         onnx_path: path to exported ONNX model.
         trace_length: input length.
         n_samples: number of random samples to verify.
@@ -68,7 +75,7 @@ def verify_onnx(
     """
     import onnxruntime as ort
 
-    model.eval()
+    model = model.cpu().eval()
     session = ort.InferenceSession(onnx_path)
 
     for _ in range(n_samples):
@@ -79,3 +86,25 @@ def verify_onnx(
         if not np.allclose(pt_out, onnx_out, atol=atol):
             return False
     return True
+
+
+if __name__ == "__main__":
+    from simtodata.models.factory import model_from_config
+
+    parser = argparse.ArgumentParser(description="Export CNN to ONNX")
+    parser.add_argument("--checkpoint", required=True, help="Path to .pt checkpoint")
+    parser.add_argument("--model-config", default="configs/model_cnn1d.yaml")
+    parser.add_argument("--output", required=True, help="Output .onnx path")
+    parser.add_argument("--trace-length", type=int, default=1024)
+    args = parser.parse_args()
+
+    model = model_from_config(args.model_config)
+    model.load_state_dict(torch.load(args.checkpoint, weights_only=True))
+
+    export_to_onnx(model, args.output, trace_length=args.trace_length)
+    print(f"Exported: {args.output}")
+
+    if verify_onnx(model, args.output, trace_length=args.trace_length):
+        print("Verification: PASSED")
+    else:
+        print("Verification: FAILED — outputs diverge")
