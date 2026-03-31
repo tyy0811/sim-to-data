@@ -15,10 +15,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from simtodata.evaluation.conformal import ConformalClassifier
 from simtodata.evaluation.cost import (
     CostMatrix,
-    compute_expected_cost,
     sweep_coverage_vs_cost,
 )
 

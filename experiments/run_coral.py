@@ -119,7 +119,7 @@ def main():
     test_f1 = f1_score(test_labels, test_preds, average="macro")
     test_acc = (test_preds == test_labels).mean()
 
-    print(f"\n  B6 test result:")
+    print("\n  B6 test result:")
     print(f"    Macro F1: {test_f1:.4f}")
     print(f"    Accuracy: {test_acc:.4f}")
 

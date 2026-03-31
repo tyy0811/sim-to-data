@@ -3,8 +3,6 @@
 import os
 
 import numpy as np
-import pytest
-import torch
 import torch.nn as nn
 
 from simtodata.export.onnx_export import export_to_onnx, verify_onnx
