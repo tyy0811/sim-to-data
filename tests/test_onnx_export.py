@@ -3,9 +3,19 @@
 import os
 
 import numpy as np
+import pytest
 import torch.nn as nn
 
-from simtodata.export.onnx_export import export_to_onnx, verify_onnx
+try:
+    import onnxruntime  # noqa: F401
+
+    from simtodata.export.onnx_export import export_to_onnx, verify_onnx
+
+    _has_ort = True
+except ImportError:
+    _has_ort = False
+
+pytestmark = pytest.mark.skipif(not _has_ort, reason="onnxruntime not installed")
 
 
 def _build_tiny_cnn():
