@@ -181,11 +181,11 @@ The experiment infrastructure is complete: `experiments/run_coral.py` fine-tunes
 # Export
 python -m simtodata.export.onnx_export --checkpoint models/B5_cnn1d_randomized_finetuned.pt --output model.onnx
 
-# Batch inference
-python -m simtodata.export.onnx_infer --model model.onnx --input data/shifted_test.npz
+# Batch inference (expects .npy traces with shape N,1,L)
+python -m simtodata.export.onnx_infer --model model.onnx --input traces.npy
 ```
 
-ONNX export verifies numerical parity with PyTorch outputs (max absolute difference < 1e-5).
+ONNX export verifies numerical parity with PyTorch outputs (max absolute difference < 1e-5). The inference CLI expects a `.npy` array of traces with shape `(N, 1, L)`, not a `.npz` archive.
 
 **Transferability caveat.** These results are for synthetic parametric shift (sensor/material configuration variation). The [stress test against real phased-array data](#stress-test-synthetic-b-scans-vs-real-phased-array-data) shows that the simulator's domain does not extend to real weld inspection &mdash; deployment on real data would require a fundamentally different data source, not just recalibration.
 
@@ -222,7 +222,7 @@ As an extension, we evaluate synthetic 2D B-scans against real phased-array weld
 
 ```bash
 # Install
-pip install -e ".[dev]"
+pip install -e ".[dev,export]"
 
 # Run tests
 pytest tests/ -v
@@ -249,9 +249,9 @@ python experiments/run_coral.py
 # V3: Generate deployment-analysis figures
 python experiments/generate_v3_figures.py
 
-# ONNX export + inference
+# ONNX export + inference (requires pip install -e ".[export]")
 python -m simtodata.export.onnx_export --checkpoint models/B5_cnn1d_randomized_finetuned.pt --output model.onnx
-python -m simtodata.export.onnx_infer --model model.onnx --input data/shifted_test.npz
+python -m simtodata.export.onnx_infer --model model.onnx --input traces.npy
 ```
 
 ## Makefile

@@ -43,7 +43,12 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--results-dir", default="results")
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--quick", action="store_true",
+                        help="Reduce epochs for fast iteration")
     args = parser.parse_args()
+
+    if args.quick:
+        args.n_epochs = 3
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
