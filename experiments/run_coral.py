@@ -142,7 +142,8 @@ def main():
 
     # Save best checkpoint
     ckpt_path = os.path.join("models", "B6_cnn1d_coral.pt")
-    torch.save(best_state, ckpt_path)
+    cpu_state = {k: v.cpu() for k, v in best_state.items()}
+    torch.save(cpu_state, ckpt_path)
     print(f"  Checkpoint: {ckpt_path}")
 
 

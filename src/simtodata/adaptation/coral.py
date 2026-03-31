@@ -60,7 +60,7 @@ class FeatureExtractor:
         layer.register_forward_hook(self._hook)
 
     def _hook(self, module, input, output):
-        self.features = output.detach()
+        self.features = output
 
     def get(self) -> Optional[torch.Tensor]:
         return self.features
