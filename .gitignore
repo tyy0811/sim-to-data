@@ -10,7 +10,6 @@ build/
 !results/multiseed/
 results/multiseed/*
 !results/multiseed/aggregated.json
-docs/figures/_generated/
 *.npz
 *.pt
 *.joblib
