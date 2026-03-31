@@ -1,0 +1,20 @@
+# Illustrative cost matrix for ultrasonic defect classification.
+# Values are relative units per inspection decision.
+# Real values would come from the operator's risk assessment.
+
+class_names: ["no_defect", "low_severity", "high_severity"]
+
+# Format: "true_class,predicted_class" -> cost
+costs:
+  "0,0": 0      # correct: no defect
+  "0,1": 1      # false alarm: predict low, true no-defect
+  "0,2": 1      # false alarm: predict high, true no-defect
+  "1,0": 50     # missed low-severity defect
+  "1,1": 0      # correct: low severity
+  "1,2": 0      # over-severity (conservative, no cost)
+  "2,0": 500    # missed high-severity defect (catastrophic)
+  "2,1": 0      # under-severity (still detected, no extra cost)
+  "2,2": 0      # correct: high severity
+
+# Cost of human review per abstained sample
+review_cost: 5

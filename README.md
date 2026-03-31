@@ -1,6 +1,21 @@
 # sim-to-data
 
-Synthetic ultrasonic inspection pipeline benchmarking defect detectors under controlled domain shift.
+Synthetic ultrasonic inspection pipeline benchmarking defect detectors under controlled domain shift, with conformal selective prediction and cost-sensitive deployment analysis.
+
+## Why This Matters
+
+In safety-critical inspection, the cost of errors is deeply asymmetric: a missed high-severity defect can lead to pipeline rupture, while a false alarm only triggers an unnecessary dig. Standard classifiers optimize for accuracy, but accuracy treats all errors equally. When a model trained on one sensor configuration is deployed on another, its confidence estimates become unreliable &mdash; it may confidently predict "no defect" on traces it has never seen before.
+
+A classifier that knows when *not* to decide is more valuable than one that is slightly more accurate on average. By combining domain randomization with conformal selective prediction, this pipeline provides a formal coverage guarantee: when it does classify, the true defect severity is in the prediction set with probability &ge; 1 &minus; &alpha;. When it cannot classify confidently, it abstains and flags the trace for human review &mdash; converting an uncontrolled failure mode into a bounded, costed review process.
+
+### Summary of Findings
+
+- Domain shift drops defect detection F1 from 0.84 to 0.27 (B1&rarr;B2)
+- Domain randomization recovers to 0.54 without any target-domain labels (B3)
+- Conformal selective prediction provides formal coverage guarantees: at 70% target coverage, the randomized model classifies with F1 = 0.83 while the unrandomized model cannot produce any useful classifications
+- Cost analysis shows the optimal operating point balances automation rate against worst-case inspection cost &mdash; accuracy alone is misleading
+- CORAL feature alignment degrades performance (0.54&rarr;0.38), confirming randomization already solves the alignment problem
+- The evaluation framework (coverage guarantees, cost analysis, human-review fallback) transfers to other inspection modalities; the model results are specific to synthetic parametric shift
 
 ## Problem
 
@@ -33,10 +48,11 @@ All CNN results (B1-B5) are reported as mean ± std across 5 training seeds on a
 | B3 | CNN (randomized) | Shifted test | **0.542 ± 0.004** | **0.738 ± 0.006** | 0.098 ± 0.032 |
 | B4 | B1 + fine-tune | Shifted test | 0.368 ± 0.008 | 0.546 ± 0.006 | 0.391 ± 0.032 |
 | B5 | B3 + fine-tune | Shifted test | **0.550 ± 0.005** | **0.747 ± 0.006** | 0.071 ± 0.022 |
+| B6 | B3 + CORAL | Shifted test | 0.376 | &mdash; | &mdash; |
 
 ### Key Findings
 
-Variance reflects training randomness (initialization, batch order) on a fixed dataset, not data-sampling variance.
+Variance reflects training randomness (initialization, batch order) on a fixed dataset, not data-sampling variance. B6 is a single-seed result (seed=42); AUROC and ECE not reported as CORAL did not improve over B3.
 
 - **Shift hurts consistently**: B1 → B2 shows a &Delta; = -0.57 F1 drop; all 5 B2 runs fall below all 5 B1 runs (no overlap in observed ranges).
 - **Randomization helps reliably**: B3 (0.542 ± 0.004) vs B2 (0.265 ± 0.011) — a stable +0.28 improvement with low variance.
@@ -114,6 +130,94 @@ Robustness and adaptation results below are from a single representative seed (s
 
 Fine-tuning the source-pretrained model plateaus at F1 &asymp; 0.37 regardless of sample count (25-200) and slightly *decreases* from 50 to 200 samples, likely due to overfitting on a small fine-tune set drawn from a distribution the model's features are poorly suited for. The randomized model starts at 0.54 with zero target labels — domain randomization cannot be replaced by more target labels at this scale.
 
+### Selective Prediction (Conformal)
+
+Conformal prediction ([APS method](https://arxiv.org/abs/2006.02544), Romano et al. 2020) provides distribution-free coverage guarantees: the true class is included in the prediction set with probability &ge; 1 &minus; &alpha;, regardless of model quality. When the prediction set contains multiple classes, the sample is flagged for human review (abstention).
+
+**Table A: Conformal Selective Prediction at Operating Points Where Models Differentiate**
+
+| Regime | &alpha; | Coverage | Abstention | Classified | Eff. F1 |
+|--------|---------|----------|------------|------------|---------|
+| B1 (source) | 0.30 | 99.9% | 78.9% | 316 / 1500 | 1.000 |
+| B1 (source) | 0.50 | 98.7% | 62.7% | 560 / 1500 | 0.981 |
+| B2 (shifted) | 0.30 | 85.9% | 100% | 0 / 1500 | &mdash; |
+| B2 (shifted) | 0.50 | 75.3% | 78.3% | 326 / 1500 | 0.299 |
+| B5 (rand+ft) | 0.30 | 97.8% | 94.3% | 85 / 1500 | 0.832 |
+| B5 (rand+ft) | 0.50 | 90.9% | 83.4% | 249 / 1500 | 0.834 |
+
+At &alpha; = 0.30, B5 selectively classifies 85 samples with F1 = 0.83 while maintaining 97.8% coverage, while B2 cannot produce any useful classifications (100% abstention). At &alpha; = 0.50, B2 classifies 326 samples but at F1 = 0.30 &mdash; domain shift renders selective prediction ineffective without randomization. Domain randomization is the difference between a model that can participate in selective prediction on shifted data and one that cannot.
+
+*At the standard &alpha; = 0.05 (95% coverage), all regimes show near-total abstention (99&ndash;100%). This is correct behavior for a 3-class classifier with ~16% error rate &mdash; the APS threshold is driven to q&#770; &asymp; 1.0, placing all three classes into every prediction set. The 95% target is too stringent for this error rate; meaningful differentiation requires relaxed coverage.*
+
+<p align="center">
+  <img src="docs/figures/_generated/abstention_by_regime.png" width="700" alt="Abstention rates by regime across coverage targets">
+</p>
+
+Calibration uses a 50/50 split of 3000 test-set softmax outputs per regime (single seed, seed=42). The coverage guarantee is finite-sample exact for the evaluation half given the calibration half.
+
+### Expected Inspection Cost
+
+An asymmetric cost matrix quantifies the deployment tradeoff: missed high-severity defects are catastrophic (cost = 500), false alarms are cheap (cost = 1), and human review of abstained samples has moderate fixed cost (cost = 5 per sample). All cost values are illustrative and would need calibration to a specific inspection context.
+
+**Table B: Cost per 1000 Inspections at Selected Operating Points**
+
+| Regime | &alpha; | Coverage | Abstention | Cost / 1000 | Classification Cost | Review Cost |
+|--------|---------|----------|------------|-------------|--------------------:|------------:|
+| B1 (source) | 0.30 | 99.9% | 78.9% | 3,947 | 0 | 5,920 |
+| B1 (source) | 0.50 | 98.7% | 62.7% | 3,600 | 700 | 4,700 |
+| B2 (shifted) | 0.30 | 85.9% | 100% | 5,000 | 0 | 7,500 |
+| B2 (shifted) | 0.50 | 75.3% | 78.3% | 3,981 | 101 | 5,870 |
+| B5 (rand+ft) | 0.30 | 97.8% | 94.3% | 4,717 | 1 | 7,075 |
+| B5 (rand+ft) | 0.50 | 90.9% | 83.4% | 5,042 | 1,308 | 6,255 |
+
+*Classification Cost and Review Cost are raw totals over the 1500-sample evaluation set; Cost / 1000 normalizes their sum to a per-1000-inspections basis.*
+
+At &alpha; = 0.50, B5's cost (5,042) exceeds the all-review baseline (5,000) because its misclassifications include missed high-severity defects (cost = 500 each). B2 achieves lower cost (3,981) at this operating point, but this is an artifact of near-total abstention (78%) combined with lucky misclassification patterns on the small classified subset &mdash; it is not a reliable operating regime because the low coverage (75%) means 1 in 4 defects are missed entirely. The cost-optimal operating point for B5 is &alpha; &asymp; 0.30, where it classifies conservatively enough to avoid expensive misses while still reducing review volume.
+
+<p align="center">
+  <img src="docs/figures/_generated/expected_cost_vs_coverage.png" width="700" alt="Expected cost per 1000 inspections vs coverage target for B1, B2, B5">
+</p>
+
+The key insight: F1 alone does not capture deployment readiness. Cost analysis reveals that a model with better F1 can produce more expensive errors when its misclassifications are asymmetrically costly. Selective prediction (conformal + cost) enables operators to choose an operating point that balances automation rate against worst-case inspection cost.
+
+### Domain Adaptation Baseline (CORAL)
+
+[CORAL](https://arxiv.org/abs/1607.01719) (Sun &amp; Saenko, 2016) aligns second-order feature statistics between source and target domains during fine-tuning. It is the simplest principled domain adaptation method &mdash; approximately 30 lines of core logic &mdash; and serves as a baseline for whether explicit alignment improves over domain randomization alone.
+
+**Table C: CORAL Adaptation Baseline (single seed, seed=42)**
+
+| ID | Setup | Eval Set | Macro-F1 |
+|----|-------|----------|----------|
+| B3 | CNN (randomized) | Shifted test | 0.542 |
+| B5 | B3 + fine-tune | Shifted test | 0.550 |
+| B6 | B3 + CORAL (weight=0.1) | Shifted test | 0.376 |
+
+CORAL degrades performance from B3's 0.542 to 0.376 &mdash; explicit covariance alignment actively hurts when domain randomization has already produced shift-invariant features. The CORAL loss is near zero throughout training (0.00002), confirming that the source and target feature distributions are already well-aligned after randomized pretraining. Forcing further alignment distorts the learned representations without benefit. The feature extraction hook stores live activations (no `.detach()`) to preserve gradient flow through the CORAL loss &mdash; detaching would make CORAL a no-op while appearing to train normally.
+
+This result is consistent with the design expectation: CORAL addresses a problem (feature distribution mismatch) that domain randomization has already solved. Including it as a baseline demonstrates that naive domain adaptation does not improve over the simpler randomization strategy for parametric shift in this modality.
+
+### Deployment Considerations
+
+**Conformal recalibration.** The coverage guarantee holds for the calibration distribution. Before deploying to a new inspection site, recalibrate on a small labeled sample from that site. The conformal threshold q&#770; can be updated in O(N) time without retraining the model.
+
+**Abstention policy.** The operating point (&alpha;) should be chosen by the inspection operator based on the cost matrix for their specific context. The framework supports loading custom cost matrices from YAML (`configs/cost_matrix.yaml`).
+
+**ONNX inference.** The best model can be exported to ONNX format for deployment without a PyTorch dependency:
+
+```bash
+# Export
+python -m simtodata.export.onnx_export --checkpoint models/B5_cnn1d_randomized_finetuned.pt --output model.onnx
+
+# Batch inference (expects .npy traces with shape N,1,L)
+python -m simtodata.export.onnx_infer --model model.onnx --input traces.npy
+```
+
+ONNX export verifies numerical parity with PyTorch outputs (max absolute difference < 1e-5). The inference CLI expects a `.npy` array of traces with shape `(N, 1, L)`, not a `.npz` archive.
+
+**Transferability.** The evaluation framework (coverage guarantee, cost analysis, human-review fallback) transfers directly to other inspection modalities, including EMAT, where lower SNR and electromagnetic coupling variability introduce additional domain shift. The conformal calibration and cost sweep do not depend on the transducer type &mdash; only the underlying model and a labeled calibration sample from the deployment regime.
+
+The model results, however, are specific to synthetic parametric shift. The [stress test against real phased-array data](#stress-test-synthetic-b-scans-vs-real-phased-array-data) shows that the simulator's domain does not extend to real weld inspection &mdash; deployment on real data would require a fundamentally different data source, not just recalibration.
+
 ## Statistical Methodology
 
 CNN experiments (B1-B5) are repeated across 5 random seeds controlling model initialization and training order on a fixed dataset (seed=42). Results are reported as mean ± standard deviation. Baseline models (B0a-B0c) use deterministic sklearn estimators and produce identical results on the fixed dataset.
@@ -140,14 +244,14 @@ As an extension, we evaluate synthetic 2D B-scans against real phased-array weld
 
 - Primary experiments use **purely synthetic data**. A [stress test against real phased-array weld data](docs/sim_to_real.md) (Virkkunen et al., 2021) is included as an extension; the extreme modality gap confirms the simulator's limits, not production readiness.
 - The "domain shift" is **controlled and parametric** — real-world shift involves corrosion, coupling variation, geometry changes, and other factors not modeled here.
-- **No domain adaptation methods** (DANN, MMD, etc.) are implemented. The study compares naive transfer, domain randomization, and supervised fine-tuning only.
+- **One domain adaptation baseline** (CORAL) is included for comparison. Full adaptation methods (DANN, MMD, adversarial training) are out of scope — the study focuses on domain randomization and selective prediction rather than closing the domain gap.
 - The defect model is a **single point reflector** — real defects have complex geometries (cracks, porosity, delamination) that produce different echo patterns.
 
 ## Quick Start
 
 ```bash
 # Install
-pip install -e ".[dev]"
+pip install -e ".[dev,export]"
 
 # Run tests
 pytest tests/ -v
@@ -163,6 +267,22 @@ python experiments/run_multiseed.py
 python experiments/aggregate_multiseed.py
 ```
 
+```bash
+# V3: Selective prediction + cost analysis (uses existing result JSONs)
+python experiments/run_conformal.py
+python experiments/run_cost_analysis.py
+
+# V3: CORAL adaptation baseline (requires training data + B3 checkpoint)
+python experiments/run_coral.py
+
+# V3: Generate deployment-analysis figures
+python experiments/generate_v3_figures.py
+
+# ONNX export + inference (requires pip install -e ".[export]")
+python -m simtodata.export.onnx_export --checkpoint models/B5_cnn1d_randomized_finetuned.pt --output model.onnx
+python -m simtodata.export.onnx_infer --model model.onnx --input traces.npy
+```
+
 ## Makefile
 
 ```bash
@@ -171,6 +291,7 @@ make train-baselines # Run B0a-B0c baselines
 make train-cnn       # Run B1-B5 CNN experiments
 make evaluate        # Run robustness + adaptation sweeps
 make figures         # Generate all figures
+make v3              # Run V3 analysis (conformal, cost, CORAL, V3 figures)
 make all             # Full pipeline
 make test            # Run test suite
 make lint            # Ruff lint check
@@ -179,7 +300,7 @@ make clean           # Remove generated artifacts
 
 ## Engineering
 
-- **167 tests** across 20 test files
+- **193 tests** across 24 test files. Tests cover simulator physics (energy conservation, noise bounds), model correctness (gradient flow, output shapes), conformal guarantees (empirical coverage &ge; target on synthetic data), cost framework (hand-verified toy cases), CORAL training (regression test for hook gradient flow), and ONNX numerical parity.
 - **CI**: GitHub Actions (lint + test on Python 3.10)
 - **Reproducibility**: All experiment scripts seed PyTorch, NumPy, and DataLoader generators
 - **Lint**: ruff, line-length 100
@@ -189,13 +310,16 @@ make clean           # Remove generated artifacts
 ```
 sim-to-data/
 ├── src/simtodata/
-│   ├── simulator/          # Forward model, defects, noise, regime config
-│   ├── data/               # Dataset generation, PyTorch dataset, transforms
-│   ├── features/           # Hand-crafted feature extraction
-│   ├── models/             # CNN, baselines, training, prediction, factory
-│   └── evaluation/         # Metrics, calibration, robustness, adaptation
-├── configs/                # YAML configs for simulator and models
-├── experiments/            # Experiment scripts and figure generation
-├── tests/                  # Test suite
-└── Makefile
+│   ├── simulator/      # Physics-based forward model with configurable regime shift
+│   ├── data/           # Dataset generation and PyTorch loaders with seeded reproducibility
+│   ├── features/       # Hand-crafted baselines (energy, zero-crossings) for CNN justification
+│   ├── models/         # CNN architecture, training loop, and config-driven factory
+│   ├── evaluation/     # Metrics, conformal prediction, and cost framework — decoupled from
+│   │                   #   the model so they work as post-hoc wrappers on any classifier
+│   ├── adaptation/     # CORAL covariance alignment — included as honest DA baseline
+│   └── export/         # ONNX export with numerical parity verification
+├── configs/            # Simulator regimes, model architecture, and cost matrix (all YAML)
+├── experiments/        # Reproducible scripts: one file per experiment, no shared mutable state
+├── tests/              # Property-based tests: physics invariants, coverage guarantees, gradient flow
+└── Makefile            # Full pipeline in one command: generate → train → evaluate → figures → v3
 ```
