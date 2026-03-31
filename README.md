@@ -1,6 +1,6 @@
 # sim-to-data
 
-Synthetic ultrasonic inspection pipeline benchmarking defect detectors under controlled domain shift.
+Synthetic ultrasonic inspection pipeline benchmarking defect detectors under controlled domain shift, with conformal selective prediction and cost-sensitive deployment analysis.
 
 ## Problem
 
@@ -151,6 +151,8 @@ An asymmetric cost matrix quantifies the deployment tradeoff: missed high-severi
 | B5 (rand+ft) | 0.30 | 97.8% | 94.3% | 4,717 | 1 | 7,075 |
 | B5 (rand+ft) | 0.50 | 90.9% | 83.4% | 5,042 | 1,308 | 6,255 |
 
+*Classification Cost and Review Cost are raw totals over the 1500-sample evaluation set; Cost / 1000 normalizes their sum to a per-1000-inspections basis.*
+
 At &alpha; = 0.50, B5's cost (5,042) exceeds the all-review baseline (5,000) because its misclassifications include missed high-severity defects (cost = 500 each). B2 achieves lower cost (3,981) at this operating point because its few classifications avoid the most expensive errors by chance. The cost-optimal operating point for B5 is &alpha; &asymp; 0.30, where it classifies conservatively enough to avoid expensive misses while still reducing review volume.
 
 <p align="center">
@@ -213,7 +215,7 @@ As an extension, we evaluate synthetic 2D B-scans against real phased-array weld
 
 - Primary experiments use **purely synthetic data**. A [stress test against real phased-array weld data](docs/sim_to_real.md) (Virkkunen et al., 2021) is included as an extension; the extreme modality gap confirms the simulator's limits, not production readiness.
 - The "domain shift" is **controlled and parametric** — real-world shift involves corrosion, coupling variation, geometry changes, and other factors not modeled here.
-- **No domain adaptation methods** (DANN, MMD, etc.) are implemented. The study compares naive transfer, domain randomization, and supervised fine-tuning only.
+- **One domain adaptation baseline** (CORAL) is included for comparison. Full adaptation methods (DANN, MMD, adversarial training) are out of scope — the study focuses on domain randomization and selective prediction rather than closing the domain gap.
 - The defect model is a **single point reflector** — real defects have complex geometries (cracks, porosity, delamination) that produce different echo patterns.
 
 ## Quick Start
@@ -236,6 +238,22 @@ python experiments/run_multiseed.py
 python experiments/aggregate_multiseed.py
 ```
 
+```bash
+# V3: Selective prediction + cost analysis (uses existing result JSONs)
+python experiments/run_conformal.py
+python experiments/run_cost_analysis.py
+
+# V3: CORAL adaptation baseline (requires training data + B3 checkpoint)
+python experiments/run_coral.py
+
+# V3: Generate deployment-analysis figures
+python experiments/generate_v3_figures.py
+
+# ONNX export + inference
+python -m simtodata.export.onnx_export --checkpoint models/B5_cnn1d_randomized_finetuned.pt --output model.onnx
+python -m simtodata.export.onnx_infer --model model.onnx --input data/shifted_test.npz
+```
+
 ## Makefile
 
 ```bash
@@ -252,7 +270,7 @@ make clean           # Remove generated artifacts
 
 ## Engineering
 
-- **167 tests** across 20 test files
+- **187 tests** across 24 test files (including conformal, cost, CORAL, and ONNX export tests)
 - **CI**: GitHub Actions (lint + test on Python 3.10)
 - **Reproducibility**: All experiment scripts seed PyTorch, NumPy, and DataLoader generators
 - **Lint**: ruff, line-length 100
@@ -266,9 +284,11 @@ sim-to-data/
 │   ├── data/               # Dataset generation, PyTorch dataset, transforms
 │   ├── features/           # Hand-crafted feature extraction
 │   ├── models/             # CNN, baselines, training, prediction, factory
-│   └── evaluation/         # Metrics, calibration, robustness, adaptation
+│   ├── evaluation/         # Metrics, calibration, conformal, cost framework
+│   ├── adaptation/         # Domain adaptation (CORAL)
+│   └── export/             # ONNX export and inference
 ├── configs/                # YAML configs for simulator and models
-├── experiments/            # Experiment scripts and figure generation
+├── experiments/            # Experiment scripts, V3 analysis, figure generation
 ├── tests/                  # Test suite
 └── Makefile
 ```
