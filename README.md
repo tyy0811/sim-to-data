@@ -114,6 +114,79 @@ Robustness and adaptation results below are from a single representative seed (s
 
 Fine-tuning the source-pretrained model plateaus at F1 &asymp; 0.37 regardless of sample count (25-200) and slightly *decreases* from 50 to 200 samples, likely due to overfitting on a small fine-tune set drawn from a distribution the model's features are poorly suited for. The randomized model starts at 0.54 with zero target labels — domain randomization cannot be replaced by more target labels at this scale.
 
+### Selective Prediction (Conformal)
+
+Conformal prediction ([APS method](https://arxiv.org/abs/2006.02544), Romano et al. 2020) provides distribution-free coverage guarantees: the true class is included in the prediction set with probability &ge; 1 &minus; &alpha;, regardless of model quality. When the prediction set contains multiple classes, the sample is flagged for human review (abstention).
+
+**Table A: Conformal Selective Prediction (&alpha; = 0.05, 95% coverage target)**
+
+| Regime | Coverage | Abstention | Classified | Eff. F1 |
+|--------|----------|------------|------------|---------|
+| B1 (source) | 100% | 99.4% | 9 / 1500 | 1.000 |
+| B2 (shifted) | 97.6% | 100% | 0 / 1500 | &mdash; |
+| B5 (rand+ft) | 100% | 100% | 0 / 1500 | &mdash; |
+
+At the standard 95% coverage level, conformal prediction correctly identifies that none of these models are confident enough for autonomous classification on most samples. With a 3-class problem and ~16% error rate even on source data, the APS threshold is driven to q&#770; &asymp; 1.0, placing all three classes into every prediction set.
+
+Differentiation appears at relaxed coverage targets. At &alpha; = 0.30 (70% target), B5 selectively classifies 85 samples with effective F1 = 0.83, while B2 still cannot produce any useful classifications (100% abstention). At &alpha; = 0.50, B1 classifies 560 samples (F1 = 0.98), B5 classifies 249 (F1 = 0.83), and B2 classifies 326 but at F1 = 0.30 &mdash; domain shift renders even relaxed selective prediction ineffective without randomization.
+
+<p align="center">
+  <img src="docs/figures/_generated/abstention_by_regime.png" width="700" alt="Abstention rates by regime across coverage targets">
+</p>
+
+Calibration uses a 50/50 split of 3000 test-set softmax outputs per regime (single seed, seed=42). The coverage guarantee is finite-sample exact for the evaluation half given the calibration half.
+
+### Expected Inspection Cost
+
+An asymmetric cost matrix quantifies the deployment tradeoff: missed high-severity defects are catastrophic (cost = 500), false alarms are cheap (cost = 1), and human review of abstained samples has moderate fixed cost (cost = 5 per sample). All cost values are illustrative and would need calibration to a specific inspection context.
+
+**Table B: Cost per 1000 Inspections at Selected Operating Points**
+
+| Regime | &alpha; | Coverage | Abstention | Cost / 1000 | Classification Cost | Review Cost |
+|--------|---------|----------|------------|-------------|--------------------:|------------:|
+| B1 (source) | 0.30 | 99.9% | 78.9% | 3,947 | 0 | 5,920 |
+| B1 (source) | 0.50 | 98.7% | 62.7% | 3,600 | 700 | 4,700 |
+| B2 (shifted) | 0.30 | 85.9% | 100% | 5,000 | 0 | 7,500 |
+| B2 (shifted) | 0.50 | 75.3% | 78.3% | 3,981 | 101 | 5,870 |
+| B5 (rand+ft) | 0.30 | 97.8% | 94.3% | 4,717 | 1 | 7,075 |
+| B5 (rand+ft) | 0.50 | 90.9% | 83.4% | 5,042 | 1,308 | 6,255 |
+
+At &alpha; = 0.50, B5's cost (5,042) exceeds the all-review baseline (5,000) because its misclassifications include missed high-severity defects (cost = 500 each). B2 achieves lower cost (3,981) at this operating point because its few classifications avoid the most expensive errors by chance. The cost-optimal operating point for B5 is &alpha; &asymp; 0.30, where it classifies conservatively enough to avoid expensive misses while still reducing review volume.
+
+<p align="center">
+  <img src="docs/figures/_generated/expected_cost_vs_coverage.png" width="700" alt="Expected cost per 1000 inspections vs coverage target for B1, B2, B5">
+</p>
+
+The key insight: F1 alone does not capture deployment readiness. Cost analysis reveals that a model with better F1 can produce more expensive errors when its misclassifications are asymmetrically costly. Selective prediction (conformal + cost) enables operators to choose an operating point that balances automation rate against worst-case inspection cost.
+
+### Domain Adaptation Baseline (CORAL)
+
+[CORAL](https://arxiv.org/abs/1607.01719) (Sun &amp; Saenko, 2016) aligns second-order feature statistics between source and target domains during fine-tuning. It is the simplest principled domain adaptation method &mdash; approximately 30 lines of core logic &mdash; and serves as a baseline for whether explicit alignment improves over domain randomization alone.
+
+The experiment infrastructure is complete: `experiments/run_coral.py` fine-tunes the B3 checkpoint with CORAL loss, sweeping `coral_weight` in {0.1, 0.5, 1.0, 5.0} and selecting by validation F1. Results (B6 row) will be populated when run against the full training data.
+
+**Expectation:** Based on the parametric nature of the shift in this simulator, CORAL is unlikely to substantially improve over B3/B5. Feature covariance alignment addresses distribution shift in learned representations, but domain randomization already forces the model to learn shift-invariant features. The honest framing: CORAL is included to demonstrate awareness of DA methods and provide a fair comparison, not because we expect it to be the answer.
+
+### Deployment Considerations
+
+**Conformal recalibration.** The coverage guarantee holds for the calibration distribution. Before deploying to a new inspection site, recalibrate on a small labeled sample from that site. The conformal threshold q&#770; can be updated in O(N) time without retraining the model.
+
+**Abstention policy.** The operating point (&alpha;) should be chosen by the inspection operator based on the cost matrix for their specific context. The framework supports loading custom cost matrices from YAML (`configs/cost_matrix.yaml`).
+
+**ONNX inference.** The best model can be exported to ONNX format for deployment without a PyTorch dependency:
+
+```bash
+# Export
+python -m simtodata.export.onnx_export --checkpoint models/B5_cnn1d_randomized_finetuned.pt --output model.onnx
+
+# Batch inference
+python -m simtodata.export.onnx_infer --model model.onnx --input data/shifted_test.npz
+```
+
+ONNX export verifies numerical parity with PyTorch outputs (max absolute difference < 1e-5).
+
+**Transferability caveat.** These results are for synthetic parametric shift (sensor/material configuration variation). The [stress test against real phased-array data](#stress-test-synthetic-b-scans-vs-real-phased-array-data) shows that the simulator's domain does not extend to real weld inspection &mdash; deployment on real data would require a fundamentally different data source, not just recalibration.
+
 ## Statistical Methodology
 
 CNN experiments (B1-B5) are repeated across 5 random seeds controlling model initialization and training order on a fixed dataset (seed=42). Results are reported as mean ± standard deviation. Baseline models (B0a-B0c) use deterministic sklearn estimators and produce identical results on the fixed dataset.
