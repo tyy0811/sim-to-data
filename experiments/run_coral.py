@@ -22,15 +22,20 @@ from torch.utils.data import DataLoader
 from simtodata.adaptation.coral import train_with_coral
 from simtodata.data.dataset import InspectionDataset
 from simtodata.data.transforms import Normalize
-from simtodata.models.factory import model_from_config
+from simtodata.models.cnn1d import DefectCNN1D
 from simtodata.models.predict import predict_batch
+
+
+# B3 checkpoint was trained with 3-block architecture, which differs from
+# the current 4-block default in configs/model_cnn1d.yaml.
+_B3_ARCH = dict(channels=(32, 64, 128), kernels=(7, 5, 3), fc_hidden=64,
+                dropout=0.3, num_classes=3, pool_size=1)
 
 
 def main():
     parser = argparse.ArgumentParser(description="CORAL adaptation baseline")
     parser.add_argument("--checkpoint", default="models/B3_cnn1d_randomized.pt",
                         help="B3 randomized pretrained checkpoint")
-    parser.add_argument("--model-config", default="configs/model_cnn1d.yaml")
     parser.add_argument("--source-data", default="data/source_train.npz")
     parser.add_argument("--target-data", default="data/shifted_train.npz")
     parser.add_argument("--val-data", default="data/shifted_val.npz")
@@ -66,8 +71,8 @@ def main():
     target_loader = DataLoader(target_ds, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False)
 
-    # Load base model
-    base_model = model_from_config(args.model_config)
+    # Load base model (3-block architecture matching checkpoint)
+    base_model = DefectCNN1D(**_B3_ARCH)
     base_model.load_state_dict(torch.load(args.checkpoint, weights_only=True))
 
     best_f1 = -1.0
@@ -77,7 +82,7 @@ def main():
 
     for cw in args.coral_weights:
         print(f"\n  coral_weight={cw}")
-        model = model_from_config(args.model_config)
+        model = DefectCNN1D(**_B3_ARCH)
         model.load_state_dict(copy.deepcopy(base_model.state_dict()))
         model.to(args.device)
 
@@ -112,7 +117,7 @@ def main():
     print(f"\n  Best coral_weight: {best_weight} (val F1: {best_f1:.4f})")
 
     # Evaluate best on test set
-    model = model_from_config(args.model_config)
+    model = DefectCNN1D(**_B3_ARCH)
     model.load_state_dict(best_state)
     model.to(args.device)
 

@@ -61,6 +61,8 @@ dataset_sizes:
   test_shifted: 3000
   adapt: 200
   train_randomized: 20000
+  train_shifted: 5000
+  val_shifted: 1000
 
 class_distribution:
   no_defect: 0.33

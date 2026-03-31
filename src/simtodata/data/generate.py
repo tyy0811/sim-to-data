@@ -98,6 +98,8 @@ def main():
         ("shifted_test", "shifted", sizes["test_shifted"]),
         ("shifted_adapt", "shifted", sizes["adapt"]),
         ("randomized_train", "randomized", sizes["train_randomized"]),
+        ("shifted_train", "shifted", sizes["train_shifted"]),
+        ("shifted_val", "shifted", sizes["val_shifted"]),
     ]
 
     for name, regime_name, n in datasets:
