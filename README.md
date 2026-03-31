@@ -2,6 +2,12 @@
 
 Synthetic ultrasonic inspection pipeline benchmarking defect detectors under controlled domain shift, with conformal selective prediction and cost-sensitive deployment analysis.
 
+## Why This Matters
+
+In safety-critical inspection, the cost of errors is deeply asymmetric: a missed high-severity defect can lead to pipeline rupture, while a false alarm only triggers an unnecessary dig. Standard classifiers optimize for accuracy, but accuracy treats all errors equally. When a model trained on one sensor configuration is deployed on another, its confidence estimates become unreliable &mdash; it may confidently predict "no defect" on traces it has never seen before.
+
+A classifier that knows when *not* to decide is more valuable than one that is slightly more accurate on average. By combining domain randomization with conformal selective prediction, this pipeline provides a formal coverage guarantee: when it does classify, the true defect severity is in the prediction set with probability &ge; 1 &minus; &alpha;. When it cannot classify confidently, it abstains and flags the trace for human review &mdash; converting an uncontrolled failure mode into a bounded, costed review process.
+
 ## Problem
 
 Industrial ultrasonic inspection systems trained on one sensor/material configuration degrade when deployed on a different one. Real shifted data is scarce, expensive, and hard to label. This project uses a physics-based forward model to generate synthetic A-scan traces with configurable domain shift, then benchmarks how well standard detectors transfer across regimes.
@@ -196,7 +202,9 @@ python -m simtodata.export.onnx_infer --model model.onnx --input traces.npy
 
 ONNX export verifies numerical parity with PyTorch outputs (max absolute difference < 1e-5). The inference CLI expects a `.npy` array of traces with shape `(N, 1, L)`, not a `.npz` archive.
 
-**Transferability caveat.** These results are for synthetic parametric shift (sensor/material configuration variation). The [stress test against real phased-array data](#stress-test-synthetic-b-scans-vs-real-phased-array-data) shows that the simulator's domain does not extend to real weld inspection &mdash; deployment on real data would require a fundamentally different data source, not just recalibration.
+**Transferability.** The evaluation framework (coverage guarantee, cost analysis, human-review fallback) transfers directly to other inspection modalities, including EMAT, where lower SNR and electromagnetic coupling variability introduce additional domain shift. The conformal calibration and cost sweep do not depend on the transducer type &mdash; only the underlying model and a labeled calibration sample from the deployment regime.
+
+The model results, however, are specific to synthetic parametric shift. The [stress test against real phased-array data](#stress-test-synthetic-b-scans-vs-real-phased-array-data) shows that the simulator's domain does not extend to real weld inspection &mdash; deployment on real data would require a fundamentally different data source, not just recalibration.
 
 ## Statistical Methodology
 
